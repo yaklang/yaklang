@@ -18,6 +18,7 @@ const (
 	PassSplitSelect      = "split-select"
 	PassDropUnreachable  = "drop-unreachable-blocks"
 	PassReversePostorder = "reverse-postorder"
+	PassDropDeadFlags    = "drop-dead-flags"
 )
 
 // Pass is one selectable LowIR transformation. A pass receives the frame model of
@@ -114,6 +115,10 @@ func init() {
 	}})
 	Register(Pass{Name: PassReversePostorder, Description: "order blocks for loop construction", Apply: func(function *core.Function, _ core.ArchFacts) error {
 		ReorderReversePostorder(function)
+		return nil
+	}})
+	Register(Pass{Name: PassDropDeadFlags, Description: "remove dead CPU flag computations and writes", Apply: func(function *core.Function, facts core.ArchFacts) error {
+		DropDeadFlags(function, facts)
 		return nil
 	}})
 }

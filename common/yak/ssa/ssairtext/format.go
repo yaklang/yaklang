@@ -2,6 +2,7 @@ package ssairtext
 
 import (
 	"fmt"
+	"io"
 	"regexp"
 	"sort"
 	"strings"
@@ -10,7 +11,8 @@ import (
 )
 
 var (
-	ssairAssignment = regexp.MustCompile(`^\t(?:<([^>]+)>\s+)?(t\d+)\s+=\s+(.*)$`)
+	ssairAssignment      = regexp.MustCompile(`^\t(?:<([^>]+)>\s+)?(t\d+)\s+=\s+(.*)$`)
+	ssairRenumberPattern = regexp.MustCompile(`\bt(\d+)\b|\((\d+)\)`)
 )
 
 // Format renders a function with one type on every assigned value and an
@@ -96,11 +98,10 @@ func Format(function *ssa.Function) string {
 func renumberIDs(text string) string {
 	// Match a value reference as a whole token. A type name such as int32 also
 	// contains t32, and a substring match would rewrite the type.
-	index := regexp.MustCompile(`\bt(\d+)\b|\((\d+)\)`)
 	next := int64(1)
 	ids := make(map[int64]int64)
-	return index.ReplaceAllStringFunc(text, func(match string) string {
-		sub := index.FindStringSubmatch(match)
+	return ssairRenumberPattern.ReplaceAllStringFunc(text, func(match string) string {
+		sub := ssairRenumberPattern.FindStringSubmatch(match)
 		var raw int64
 		if sub[1] != "" {
 			fmt.Sscanf(sub[1], "%d", &raw)
@@ -152,6 +153,15 @@ func parseID(name string) int64 {
 	return id
 }
 
+// FormatTo writes formatted SSAIR text for function directly into w.
+func FormatTo(w io.Writer, function *ssa.Function) error {
+	if function == nil {
+		return nil
+	}
+	_, err := io.WriteString(w, Format(function))
+	return err
+}
+
 // FormatProgram renders every non-extern function, prefixed by extern
 // declarations. The result is stable: parsing it back and formatting again
 // yields the same text.
@@ -160,6 +170,15 @@ func FormatProgram(program *ssa.Program) string {
 		return ""
 	}
 	var output strings.Builder
+	_ = FormatProgramTo(&output, program)
+	return output.String()
+}
+
+// FormatProgramTo streams formatted SSAIR text for program directly into w.
+func FormatProgramTo(w io.Writer, program *ssa.Program) error {
+	if program == nil {
+		return nil
+	}
 	var externs []string
 	program.Funcs.ForEach(func(name string, function *ssa.Function) bool {
 		if function == nil {
@@ -172,14 +191,20 @@ func FormatProgram(program *ssa.Program) string {
 	})
 	sort.Strings(externs)
 	for _, name := range externs {
-		fmt.Fprintf(&output, "extern %s\n", name)
+		if _, err := fmt.Fprintf(w, "extern %s\n", name); err != nil {
+			return err
+		}
 	}
+	var writeErr error
 	program.Funcs.ForEach(func(_ string, function *ssa.Function) bool {
 		if function == nil || function.IsExtern() {
 			return true
 		}
-		output.WriteString(Format(function))
+		if _, err := io.WriteString(w, Format(function)); err != nil {
+			writeErr = err
+			return false
+		}
 		return true
 	})
-	return output.String()
+	return writeErr
 }

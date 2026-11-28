@@ -77,3 +77,72 @@ func (p *Program) FlushInstruction() {
 		return true
 	})
 }
+
+// FlushFunctions publishes one batch of newly converted/transformed functions
+// to the instruction cache before their compile unit is flushed and evicted.
+func (p *Program) FlushFunctions(functions []*Function) {
+	if p == nil || p.Cache == nil {
+		return
+	}
+	for _, function := range functions {
+		if function == nil {
+			continue
+		}
+		if name := function.GetName(); name != "" {
+			p.Cache.AddVariable(name, function)
+		}
+		p.Cache.MarkInstructionDirty(function)
+		for _, paramID := range function.Params {
+			if param, ok := function.GetInstructionById(paramID); ok && param != nil {
+				p.Cache.MarkInstructionDirty(param)
+			}
+		}
+		for _, blockID := range function.Blocks {
+			block, ok := function.GetBasicBlockByID(blockID)
+			if !ok || block == nil {
+				continue
+			}
+			p.Cache.MarkInstructionDirty(block)
+			for _, id := range block.Phis {
+				if inst, ok := function.GetInstructionById(id); ok && inst != nil {
+					p.Cache.MarkInstructionDirty(inst)
+				}
+			}
+			for _, id := range block.Insts {
+				if inst, ok := function.GetInstructionById(id); ok && inst != nil {
+					p.Cache.MarkInstructionDirty(inst)
+				}
+			}
+		}
+	}
+}
+
+// SaveFlushedToDatabase persists a DB-backed program whose finished functions
+// were already published and flushed per compile unit via FlushFunctions and
+// FlushCompileUnit. Only extern stubs still need final variable/instruction
+// registration before updating program metadata and closing the caches.
+func (p *Program) SaveFlushedToDatabase() error {
+	if p == nil || p.Cache == nil {
+		return fmt.Errorf("ssa: nil program cache")
+	}
+	if !p.Cache.HaveDatabaseBackend() {
+		return fmt.Errorf("ssa: program %q uses an in-memory cache", p.Name)
+	}
+	if p.DatabaseKind != ProgramCacheDBWrite {
+		return fmt.Errorf("ssa: program %q is not on the database write cache", p.Name)
+	}
+	if p.Funcs != nil {
+		p.Funcs.ForEach(func(_ string, function *Function) bool {
+			if function == nil || !function.IsExtern() {
+				return true
+			}
+			if name := function.GetName(); name != "" {
+				p.Cache.AddVariable(name, function)
+			}
+			p.Cache.MarkInstructionDirty(function)
+			return true
+		})
+	}
+	p.UpdateToDatabase()()
+	return p.Cache.SaveToDatabase()
+}

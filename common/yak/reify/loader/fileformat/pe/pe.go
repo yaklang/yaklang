@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
@@ -145,8 +144,8 @@ func inspectPE(reader *core.ByteReader) (*core.Image, core.Target, *core.Boundar
 		}
 	}
 	parsePECOFFSymbols(file, image)
-	parsePEExports(file, image, directories, image.Base)
-	parsePEExceptionTable(file, &target, image, directories, hints)
+	parsePEExports(reader, file, image, directories, image.Base)
+	parsePEExceptionTable(reader, file, &target, image, directories, hints)
 	if len(image.Symbols) > 0 {
 		seen := make(map[uint64]bool, len(image.Symbols))
 		for _, item := range image.Symbols {
@@ -158,21 +157,7 @@ func inspectPE(reader *core.ByteReader) (*core.Image, core.Target, *core.Boundar
 		}
 	}
 	hints.FunctionStarts = uniqueAddresses(hints.FunctionStarts)
-	if imported, err := file.ImportedSymbols(); err == nil {
-		for _, name := range imported {
-			// debug/pe renders each entry as "symbol:library".
-			symbol, library, ok := strings.Cut(name, ":")
-			if !ok {
-				library, symbol = "", name
-			}
-			image.Symbols = append(image.Symbols, sym.Symbol{
-				Name:     symbol,
-				Kind:     sym.SymbolFunction,
-				Imported: true,
-				Library:  library,
-			})
-		}
-	}
+	parsePEImports(reader, file, image, directories, target.Bits == 64)
 	return image, target, hints, nil, nil
 }
 
@@ -225,7 +210,7 @@ func parsePECOFFSymbols(file *pe.File, image *core.Image) {
 
 // parsePEExports reads the export directory so exported functions get names and
 // exact addresses even when COFF symbols were stripped.
-func parsePEExports(file *pe.File, image *core.Image, directories []pe.DataDirectory, base uint64) {
+func parsePEExports(reader *core.ByteReader, file *pe.File, image *core.Image, directories []pe.DataDirectory, base uint64) {
 	if len(directories) <= pe.IMAGE_DIRECTORY_ENTRY_EXPORT {
 		return
 	}
@@ -233,34 +218,36 @@ func parsePEExports(file *pe.File, image *core.Image, directories []pe.DataDirec
 	if directory.VirtualAddress == 0 || directory.Size < 40 {
 		return
 	}
-	data, err := peReadRVA(file, directory.VirtualAddress, directory.Size)
+	data, err := peReadRVA(reader, file, directory.VirtualAddress, 40)
 	if err != nil || len(data) < 40 {
 		return
 	}
 	order := binary.LittleEndian
-	numberOfFunctions := int(order.Uint32(data[20:24]))
-	numberOfNames := int(order.Uint32(data[24:28]))
+	numberOfFunctions := uint64(order.Uint32(data[20:24]))
+	numberOfNames := uint64(order.Uint32(data[24:28]))
 	functionsRVA := order.Uint32(data[28:32])
 	namesRVA := order.Uint32(data[32:36])
 	ordinalsRVA := order.Uint32(data[36:40])
-	if numberOfFunctions <= 0 || numberOfNames <= 0 || numberOfNames > numberOfFunctions {
+	const maxExportEntries = 1 << 20
+	if numberOfFunctions == 0 || numberOfNames == 0 || numberOfNames > numberOfFunctions || numberOfFunctions > maxExportEntries {
 		return
 	}
-	names, err := peReadRVA(file, namesRVA, uint32(numberOfNames*4))
-	if err != nil {
+	names, err := peReadRVA(reader, file, namesRVA, uint32(numberOfNames*4))
+	if err != nil || uint64(len(names)) < numberOfNames*4 {
 		return
 	}
-	functions, err := peReadRVA(file, functionsRVA, uint32(numberOfFunctions*4))
-	if err != nil {
+	functions, err := peReadRVA(reader, file, functionsRVA, uint32(numberOfFunctions*4))
+	if err != nil || uint64(len(functions)) < numberOfFunctions*4 {
 		return
 	}
-	ordinals, err := peReadRVA(file, ordinalsRVA, uint32(numberOfNames*2))
-	if err != nil {
+	ordinals, err := peReadRVA(reader, file, ordinalsRVA, uint32(numberOfNames*2))
+	if err != nil || uint64(len(ordinals)) < numberOfNames*2 {
 		return
 	}
-	for index := 0; index < numberOfNames; index++ {
+	var strBuf [512]byte
+	for index := uint64(0); index < numberOfNames; index++ {
 		nameRVA := order.Uint32(names[index*4:])
-		ordinal := int(order.Uint16(ordinals[index*2:]))
+		ordinal := uint64(order.Uint16(ordinals[index*2:]))
 		if ordinal >= numberOfFunctions {
 			continue
 		}
@@ -268,7 +255,7 @@ func parsePEExports(file *pe.File, image *core.Image, directories []pe.DataDirec
 		if functionRVA == 0 {
 			continue
 		}
-		name, err := peReadCString(file, nameRVA)
+		name, err := peReadCString(reader, file, nameRVA, strBuf[:])
 		if err != nil || name == "" {
 			continue
 		}
@@ -283,7 +270,7 @@ func parsePEExports(file *pe.File, image *core.Image, directories []pe.DataDirec
 // parsePEExceptionTable reads the pdata RUNTIME_FUNCTION table. Each entry
 // starts at a function's begin address, which gives exact boundaries without
 // disassembly.
-func parsePEExceptionTable(file *pe.File, target *core.Target, image *core.Image, directories []pe.DataDirectory, hints *core.BoundaryHints) {
+func parsePEExceptionTable(reader *core.ByteReader, file *pe.File, target *core.Target, image *core.Image, directories []pe.DataDirectory, hints *core.BoundaryHints) {
 	if len(directories) <= peDirectoryException {
 		return
 	}
@@ -295,11 +282,18 @@ func parsePEExceptionTable(file *pe.File, target *core.Target, image *core.Image
 	if directory.VirtualAddress == 0 || directory.Size < entrySize {
 		return
 	}
-	data, err := peReadRVA(file, directory.VirtualAddress, directory.Size)
+	data, err := peReadRVA(reader, file, directory.VirtualAddress, directory.Size)
 	if err != nil {
 		return
 	}
-	seen := make(map[uint64]bool)
+	existing := make(map[uint64]bool, len(image.Symbols))
+	for _, item := range image.Symbols {
+		if item.Imported || item.Address == 0 {
+			continue
+		}
+		existing[item.Address] = true
+	}
+	seen := make(map[uint64]bool, len(data)/int(entrySize))
 	for offset := 0; offset+int(entrySize) <= len(data); offset += int(entrySize) {
 		begin := uint32(binary.LittleEndian.Uint32(data[offset:]))
 		if begin == 0 {
@@ -311,12 +305,122 @@ func parsePEExceptionTable(file *pe.File, target *core.Target, image *core.Image
 		}
 		seen[address] = true
 		hints.FunctionStarts = append(hints.FunctionStarts, address)
-		if _, known := image.SymbolAt(address); !known {
+		if !existing[address] {
+			existing[address] = true
 			image.Symbols = append(image.Symbols, sym.Symbol{
 				Name:    fmt.Sprintf("sub_0x%x", address),
 				Address: address,
 				Kind:    sym.SymbolFunction,
 			})
+		}
+	}
+}
+
+// parsePEImports reads the PE import directory directly from bounded RVA slices,
+// avoiding stdlib pe.File.ImportedSymbols which reads the entire containing
+// section (often >100 MB .rdata) into memory once per imported DLL.
+func parsePEImports(reader *core.ByteReader, file *pe.File, image *core.Image, directories []pe.DataDirectory, isPE64 bool) {
+	if len(directories) <= pe.IMAGE_DIRECTORY_ENTRY_IMPORT {
+		return
+	}
+	directory := directories[pe.IMAGE_DIRECTORY_ENTRY_IMPORT]
+	if directory.VirtualAddress == 0 || directory.Size < 20 {
+		return
+	}
+	const (
+		maxImportDirBytes = 4 << 20
+		maxImportDLLs     = 1 << 14
+		maxImportSymbols  = 1 << 20
+		thunkChunkSize    = 4096
+	)
+	readLen := directory.Size
+	if readLen > maxImportDirBytes {
+		readLen = maxImportDirBytes
+	}
+	dirData, err := peReadRVA(reader, file, directory.VirtualAddress, readLen)
+	if err != nil || len(dirData) < 20 {
+		return
+	}
+	order := binary.LittleEndian
+	step := uint32(4)
+	if isPE64 {
+		step = 8
+	}
+	var (
+		thunkBuf [thunkChunkSize]byte
+		strBuf   [512]byte
+		total    int
+	)
+	descriptors := 0
+	for off := 0; off+20 <= len(dirData) && descriptors < maxImportDLLs; off += 20 {
+		descriptors++
+		origFirstThunk := order.Uint32(dirData[off:])
+		nameRVA := order.Uint32(dirData[off+12:])
+		firstThunk := order.Uint32(dirData[off+16:])
+		if origFirstThunk == 0 && nameRVA == 0 && firstThunk == 0 {
+			break
+		}
+		if origFirstThunk == 0 {
+			// Match stdlib debug/pe behavior when OriginalFirstThunk is absent,
+			// while still falling back if Name is present? Only use FirstThunk when valid.
+			origFirstThunk = firstThunk
+		}
+		if origFirstThunk == 0 || nameRVA == 0 {
+			continue
+		}
+		dll, err := peReadCString(reader, file, nameRVA, strBuf[:])
+		if err != nil || dll == "" {
+			continue
+		}
+		curRVA := origFirstThunk
+		for total < maxImportSymbols {
+			n, err := peReadRVABuf(reader, file, curRVA, thunkBuf[:])
+			if err != nil || n < int(step) {
+				break
+			}
+			usable := (n / int(step)) * int(step)
+			done := false
+			for i := 0; i < usable && total < maxImportSymbols; i += int(step) {
+				var entry uint64
+				if isPE64 {
+					entry = order.Uint64(thunkBuf[i:])
+					if entry == 0 {
+						done = true
+						break
+					}
+					if entry&(1<<63) != 0 {
+						continue
+					}
+				} else {
+					v := order.Uint32(thunkBuf[i:])
+					if v == 0 {
+						done = true
+						break
+					}
+					if v&(1<<31) != 0 {
+						continue
+					}
+					entry = uint64(v)
+				}
+				if entry > math.MaxUint32-2 {
+					continue
+				}
+				fn, err := peReadCString(reader, file, uint32(entry)+2, strBuf[:])
+				if err != nil || fn == "" {
+					continue
+				}
+				image.Symbols = append(image.Symbols, sym.Symbol{
+					Name:     fn,
+					Kind:     sym.SymbolFunction,
+					Imported: true,
+					Library:  dll,
+				})
+				total++
+			}
+			if done || uint64(curRVA)+uint64(usable) > math.MaxUint32 {
+				break
+			}
+			curRVA += uint32(usable)
 		}
 	}
 }
@@ -338,35 +442,88 @@ func uniqueAddresses(addresses []uint64) []uint64 {
 	return result
 }
 
-func peReadRVA(file *pe.File, rva, size uint32) ([]byte, error) {
+func peFindRVASection(file *pe.File, rva uint32) (*pe.Section, uint64, uint64, error) {
 	for _, section := range file.Sections {
 		if rva < section.VirtualAddress || rva-section.VirtualAddress >= section.VirtualSize {
 			continue
 		}
-		delta := rva - section.VirtualAddress
-		if delta+size > section.Size {
-			size = section.Size - delta
+		delta := uint64(rva - section.VirtualAddress)
+		if delta >= uint64(section.Size) {
+			return nil, 0, 0, fmt.Errorf("PE RVA 0x%x has no file data", rva)
 		}
-		if size == 0 {
-			return nil, fmt.Errorf("PE RVA 0x%x has no file data", rva)
-		}
-		data, err := section.Data()
-		if err != nil {
-			return nil, err
-		}
-		if int(delta)+int(size) > len(data) {
-			size = uint32(len(data)) - delta
-		}
-		return data[delta : delta+size], nil
+		avail := uint64(section.Size) - delta
+		return section, delta, avail, nil
 	}
-	return nil, fmt.Errorf("PE RVA 0x%x is not in a section", rva)
+	return nil, 0, 0, fmt.Errorf("PE RVA 0x%x is not in a section", rva)
 }
 
-func peReadCString(file *pe.File, rva uint32) (string, error) {
-	data, err := peReadRVA(file, rva, 512)
+func peReadRVA(reader *core.ByteReader, file *pe.File, rva, size uint32) ([]byte, error) {
+	section, delta, avail, err := peFindRVASection(file, rva)
 	if err != nil {
+		return nil, err
+	}
+	readSize := uint64(size)
+	if readSize > avail {
+		readSize = avail
+	}
+	if readSize == 0 {
+		return nil, fmt.Errorf("PE RVA 0x%x has no file data", rva)
+	}
+	if reader != nil {
+		return reader.Bytes(uint64(section.Offset)+delta, readSize)
+	}
+	data, err := section.Data()
+	if err != nil {
+		return nil, err
+	}
+	if delta >= uint64(len(data)) {
+		return nil, fmt.Errorf("PE RVA 0x%x has no file data", rva)
+	}
+	if delta+readSize > uint64(len(data)) {
+		readSize = uint64(len(data)) - delta
+	}
+	return data[delta : delta+readSize], nil
+}
+
+func peReadRVABuf(reader *core.ByteReader, file *pe.File, rva uint32, dst []byte) (int, error) {
+	section, delta, avail, err := peFindRVASection(file, rva)
+	if err != nil {
+		return 0, err
+	}
+	readSize := uint64(len(dst))
+	if readSize > avail {
+		readSize = avail
+	}
+	if readSize == 0 {
+		return 0, fmt.Errorf("PE RVA 0x%x has no file data", rva)
+	}
+	if reader != nil {
+		n, err := reader.ReadAt(dst[:int(readSize)], int64(uint64(section.Offset)+delta))
+		if n > 0 {
+			return n, nil
+		}
+		return 0, err
+	}
+	data, err := section.Data()
+	if err != nil {
+		return 0, err
+	}
+	if delta >= uint64(len(data)) {
+		return 0, fmt.Errorf("PE RVA 0x%x has no file data", rva)
+	}
+	n := copy(dst, data[delta:])
+	return n, nil
+}
+
+func peReadCString(reader *core.ByteReader, file *pe.File, rva uint32, scratch []byte) (string, error) {
+	if len(scratch) == 0 {
+		scratch = make([]byte, 512)
+	}
+	n, err := peReadRVABuf(reader, file, rva, scratch)
+	if err != nil || n == 0 {
 		return "", err
 	}
+	data := scratch[:n]
 	end := 0
 	for end < len(data) && data[end] != 0 {
 		end++

@@ -289,6 +289,42 @@ func TestAddressOverflow(t *testing.T) {
 	}
 }
 
+func TestPEOversizedExportAndImportGuards(t *testing.T) {
+	raw := fixture(t, fixtureOptions{exports: true, imports: true})
+	binary.LittleEndian.PutUint32(raw[fixtureExportFile+20:], 0x7fffffff)
+	binary.LittleEndian.PutUint32(raw[fixtureExportFile+24:], 0x7fffffff)
+	// Corrupt import thunk with an invalid large hint/name RVA; loader must not panic or OOM.
+	binary.LittleEndian.PutUint64(raw[fixtureImportFile+0x60:], 0x7ffffff0)
+	artifact, err := (Loader{}).Load(context.Background(), newReader(t, raw))
+	if err != nil {
+		t.Fatalf("Load failed unexpectedly: %v", err)
+	}
+	if artifact == nil || artifact.Image == nil {
+		t.Fatal("nil artifact")
+	}
+}
+
+func TestPEParseImportsPE32AndFirstThunkFallback(t *testing.T) {
+	raw := fixture(t, fixtureOptions{imports: true})
+	// Switch PE32+ optional header in-place or exercise FirstThunk fallback cleanly on PE32+
+	// by zeroing OriginalFirstThunk while keeping FirstThunk and Name intact.
+	binary.LittleEndian.PutUint32(raw[fixtureImportFile+0:], 0)
+	artifact, err := (Loader{}).Load(context.Background(), newReader(t, raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, item := range artifact.Image.Symbols {
+		if item.Imported && item.Name == "ExitProcess" && item.Library == "KERNEL32.dll" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("FirstThunk fallback import not recovered: %+v", artifact.Image.Symbols)
+	}
+}
+
 // peWithSymbol appends one COFF symbol to the fixture and points the file header
 // at it. Value is the offset inside .text.
 func peWithSymbol(t *testing.T, name string, value uint32) []byte {

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -18,65 +19,115 @@ func Format(ir *core.LowIR) string {
 		return ""
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "target: %s/%s (%d-bit, %s-endian)\n", ir.Target.OS, ir.Target.Architecture, ir.Target.Bits, ir.Target.ByteOrder)
+	_ = FormatTo(&b, ir)
+	return b.String()
+}
+
+// FormatTo streams LowIR text directly into w without buffering the whole program.
+func FormatTo(w io.Writer, ir *core.LowIR) error {
+	if ir == nil {
+		return nil
+	}
+	if err := FormatHeaderTo(w, ir); err != nil {
+		return err
+	}
+	for _, function := range ir.Functions {
+		if err := FormatFunctionTo(w, function); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// FormatHeaderTo writes the LowIR target, frame, register and canary headers.
+func FormatHeaderTo(w io.Writer, ir *core.LowIR) error {
+	if ir == nil {
+		return nil
+	}
+	if _, err := fmt.Fprintf(w, "target: %s/%s (%d-bit, %s-endian)\n", ir.Target.OS, ir.Target.Architecture, ir.Target.Bits, ir.Target.ByteOrder); err != nil {
+		return err
+	}
 	// The architecture facts are data, so the text form has to carry them:
 	// without them a pass cannot name a stack pointer or bind an argument
 	// register, and a round trip would silently change what the program means.
 	if line := formatFrame(ir.Frame); line != "" {
-		b.WriteString(line)
+		if _, err := io.WriteString(w, line); err != nil {
+			return err
+		}
 	}
 	if line := formatRegisters(ir.Registers); line != "" {
-		b.WriteString(line)
+		if _, err := io.WriteString(w, line); err != nil {
+			return err
+		}
 	}
 	if line := formatCanary(ir.Canary); line != "" {
-		b.WriteString(line)
-	}
-	for _, function := range ir.Functions {
-		if function.Name != "" {
-			fmt.Fprintf(&b, "function %s @ 0x%x\n", quoteName(function.Name), function.Address)
-		} else {
-			fmt.Fprintf(&b, "function f%d @ 0x%x\n", function.ID, function.Address)
+		if _, err := io.WriteString(w, line); err != nil {
+			return err
 		}
-		b.WriteString(formatFunctionFacts(function.Facts))
-		for _, block := range function.Blocks {
-			fmt.Fprintf(&b, "block b%d @ 0x%x\n", block.ID, block.Address)
-			for _, instruction := range block.Instructions {
-				fmt.Fprintf(&b, "  0x%x  ", instruction.Address)
-				if len(instruction.Results) > 0 {
-					results := make([]string, 0, len(instruction.Results))
-					for _, result := range instruction.Results {
-						results = append(results, fmt.Sprintf("v%d:%s", result.ID, formatValueType(result.Type)))
+	}
+	return nil
+}
+
+// FormatFunctionTo renders one LowIR Function directly into w.
+func FormatFunctionTo(w io.Writer, function core.Function) error {
+	var b strings.Builder
+	if function.Name != "" {
+		fmt.Fprintf(&b, "function %s @ 0x%x\n", quoteName(function.Name), function.Address)
+	} else {
+		fmt.Fprintf(&b, "function f%d @ 0x%x\n", function.ID, function.Address)
+	}
+	b.WriteString(formatFunctionFacts(function.Facts))
+	for _, block := range function.Blocks {
+		fmt.Fprintf(&b, "block b%d @ 0x%x\n", block.ID, block.Address)
+		for _, instruction := range block.Instructions {
+			fmt.Fprintf(&b, "  0x%x  ", instruction.Address)
+			if len(instruction.Results) > 0 {
+				for i, result := range instruction.Results {
+					if i > 0 {
+						b.WriteString(", ")
 					}
-					b.WriteString(strings.Join(results, ", "))
-					b.WriteString(" = ")
+					fmt.Fprintf(&b, "v%d:%s", result.ID, formatValueType(result.Type))
 				}
-				b.WriteString(string(instruction.Kind))
-				if len(instruction.Operands) > 0 {
-					operands := make([]string, 0, len(instruction.Operands))
-					for _, operand := range instruction.Operands {
-						operands = append(operands, formatOperand(operand))
-					}
-					b.WriteString(" ")
-					b.WriteString(strings.Join(operands, ", "))
-				}
-				if len(instruction.Targets) > 0 {
-					targets := make([]string, 0, len(instruction.Targets))
-					for _, target := range instruction.Targets {
-						targets = append(targets, fmt.Sprintf("b%d", target))
-					}
-					b.WriteString(" -> ")
-					b.WriteString(strings.Join(targets, ", "))
-				}
-				if instruction.Effects != core.EffectNone {
-					b.WriteString(" [")
-					b.WriteString(formatEffects(instruction.Effects))
-					b.WriteString("]")
-				}
-				b.WriteString("\n")
+				b.WriteString(" = ")
 			}
+			b.WriteString(string(instruction.Kind))
+			if len(instruction.Operands) > 0 {
+				b.WriteByte(' ')
+				for i, operand := range instruction.Operands {
+					if i > 0 {
+						b.WriteString(", ")
+					}
+					b.WriteString(formatOperand(operand))
+				}
+			}
+			if len(instruction.Targets) > 0 {
+				b.WriteString(" -> ")
+				for i, target := range instruction.Targets {
+					if i > 0 {
+						b.WriteString(", ")
+					}
+					fmt.Fprintf(&b, "b%d", target)
+				}
+			}
+			if instruction.Effects != core.EffectNone {
+				b.WriteString(" [")
+				b.WriteString(formatEffects(instruction.Effects))
+				b.WriteString("]")
+			}
+			b.WriteByte('\n')
+		}
+		if b.Len() >= 32*1024 {
+			if _, err := io.WriteString(w, b.String()); err != nil {
+				return err
+			}
+			b.Reset()
 		}
 	}
-	return b.String()
+	if b.Len() > 0 {
+		_, err := io.WriteString(w, b.String())
+		return err
+	}
+	return nil
 }
 
 func formatValueType(t core.ValueType) string {

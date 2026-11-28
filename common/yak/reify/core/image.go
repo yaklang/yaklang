@@ -1,6 +1,7 @@
 package core
 
 import (
+	"sort"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core/symbol"
@@ -44,18 +45,134 @@ type Image struct {
 	Symbols     []symbol.Symbol `json:"symbols,omitempty"`
 	Relocations []Relocation    `json:"relocations,omitempty"`
 
-	// byAddress indexes Symbols by address, built on first use.
-	once      sync.Once
-	byAddress map[uint64][]symbol.Symbol
+	// Compact lazy indexes storing int32 indices into Symbols/Relocations so the
+	// index never duplicates full symbol.Symbol or Relocation values in memory.
+	once           sync.Once
+	byAddressFirst map[uint64]int32
+	byAddressExtra map[uint64][]int32
+	byName         map[string]int32
+	byMangled      map[string]int32
+	sizedSymbols   []int32
+	sizedMaxEnd    []uint64
+	sortedAddrs    []uint64
+	relocOnce      sync.Once
+	relocByAddr    map[uint64]int32
 }
 
 // SetSymbols replaces the symbol table during artifact construction. Call it
 // before publishing the image to concurrent readers; it invalidates the lazy
-// address index when a metadata layer adds or renames symbols.
+// indexes when a metadata layer adds or renames symbols.
 func (i *Image) SetSymbols(symbols []symbol.Symbol) {
 	i.Symbols = symbols
 	i.once = sync.Once{}
-	i.byAddress = nil
+	i.byAddressFirst = nil
+	i.byAddressExtra = nil
+	i.byName = nil
+	i.byMangled = nil
+	i.sizedSymbols = nil
+	i.sizedMaxEnd = nil
+	i.sortedAddrs = nil
+}
+
+func (i *Image) ensureSymbolIndex() {
+	i.once.Do(func() {
+		n := len(i.Symbols)
+		i.byAddressFirst = make(map[uint64]int32, n)
+		i.byName = make(map[string]int32, n)
+		var mangledCount int
+		var sizedCount int
+		var addrCount int
+		for idx := range i.Symbols {
+			entry := &i.Symbols[idx]
+			if entry.Mangled != "" {
+				mangledCount++
+			}
+			if !entry.Imported && entry.Address != 0 {
+				addrCount++
+				if entry.Size > 0 {
+					sizedCount++
+				}
+			}
+		}
+		if mangledCount > 0 {
+			i.byMangled = make(map[string]int32, mangledCount)
+		}
+		if sizedCount > 0 {
+			i.sizedSymbols = make([]int32, 0, sizedCount)
+		}
+		if addrCount > 0 {
+			i.sortedAddrs = make([]uint64, 0, addrCount)
+		}
+		for idx := range i.Symbols {
+			entry := &i.Symbols[idx]
+			pos := int32(idx)
+			if first, exists := i.byAddressFirst[entry.Address]; exists {
+				if i.byAddressExtra == nil {
+					i.byAddressExtra = make(map[uint64][]int32)
+				}
+				extra := i.byAddressExtra[entry.Address]
+				if len(extra) == 0 {
+					extra = []int32{first, pos}
+				} else {
+					extra = append(extra, pos)
+				}
+				i.byAddressExtra[entry.Address] = extra
+			} else {
+				i.byAddressFirst[entry.Address] = pos
+			}
+			if entry.Name != "" {
+				if _, exists := i.byName[entry.Name]; !exists {
+					i.byName[entry.Name] = pos
+				}
+			}
+			if entry.Mangled != "" && i.byMangled != nil {
+				if _, exists := i.byMangled[entry.Mangled]; !exists {
+					i.byMangled[entry.Mangled] = pos
+				}
+			}
+			if !entry.Imported && entry.Address != 0 {
+				i.sortedAddrs = append(i.sortedAddrs, entry.Address)
+				if entry.Size > 0 {
+					i.sizedSymbols = append(i.sizedSymbols, pos)
+				}
+			}
+		}
+		if len(i.sizedSymbols) > 1 {
+			sort.Slice(i.sizedSymbols, func(a, b int) bool {
+				sa := i.Symbols[i.sizedSymbols[a]].Address
+				sb := i.Symbols[i.sizedSymbols[b]].Address
+				if sa != sb {
+					return sa < sb
+				}
+				return i.sizedSymbols[a] < i.sizedSymbols[b]
+			})
+		}
+		if len(i.sizedSymbols) > 0 {
+			i.sizedMaxEnd = make([]uint64, len(i.sizedSymbols))
+			var maxEnd uint64
+			for pos, symIdx := range i.sizedSymbols {
+				entry := &i.Symbols[symIdx]
+				end := entry.Address + entry.Size
+				if end < entry.Address {
+					end = ^uint64(0)
+				}
+				if end > maxEnd {
+					maxEnd = end
+				}
+				i.sizedMaxEnd[pos] = maxEnd
+			}
+		}
+		if len(i.sortedAddrs) > 1 {
+			sort.Slice(i.sortedAddrs, func(a, b int) bool { return i.sortedAddrs[a] < i.sortedAddrs[b] })
+			dedup := i.sortedAddrs[:1]
+			for _, addr := range i.sortedAddrs[1:] {
+				if addr != dedup[len(dedup)-1] {
+					dedup = append(dedup, addr)
+				}
+			}
+			i.sortedAddrs = dedup
+		}
+	})
 }
 
 func (i *Image) ImageBase() uint64 {
@@ -98,15 +215,22 @@ func (i *Image) SectionAt(address uint64) (*Section, bool) {
 
 // RelocationAt returns the relocation that writes this address.
 func (i *Image) RelocationAt(address uint64) (Relocation, bool) {
-	if i == nil {
+	if i == nil || len(i.Relocations) == 0 {
 		return Relocation{}, false
 	}
-	for _, relocation := range i.Relocations {
-		if relocation.Address == address {
-			return relocation, true
+	i.relocOnce.Do(func() {
+		i.relocByAddr = make(map[uint64]int32, len(i.Relocations))
+		for idx, relocation := range i.Relocations {
+			if _, exists := i.relocByAddr[relocation.Address]; !exists {
+				i.relocByAddr[relocation.Address] = int32(idx)
+			}
 		}
+	})
+	idx, ok := i.relocByAddr[address]
+	if !ok {
+		return Relocation{}, false
 	}
-	return Relocation{}, false
+	return i.Relocations[idx], true
 }
 
 // InferredSymbolSize returns the byte range a symbol covers when its format
@@ -125,16 +249,13 @@ func (i *Image) InferredSymbolSize(entry symbol.Symbol) uint64 {
 	if limit <= entry.Address {
 		limit = section.VirtualAddress + section.MemorySize
 	}
+	i.ensureSymbolIndex()
 	next := limit
-	for _, other := range i.Symbols {
-		if other.Imported || other.Address <= entry.Address {
-			continue
-		}
-		if other.Address-section.VirtualAddress >= section.MemorySize {
-			continue
-		}
-		if other.Address < next {
-			next = other.Address
+	pos := sort.Search(len(i.sortedAddrs), func(idx int) bool { return i.sortedAddrs[idx] > entry.Address })
+	if pos < len(i.sortedAddrs) {
+		cand := i.sortedAddrs[pos]
+		if cand-section.VirtualAddress < section.MemorySize && cand < next {
+			next = cand
 		}
 	}
 	if next <= entry.Address {
@@ -146,16 +267,23 @@ func (i *Image) InferredSymbolSize(entry symbol.Symbol) uint64 {
 // SymbolsAt returns every symbol defined at one address. Several symbols share an
 // address: a mapping symbol marks the start of a run and the function name follows.
 func (i *Image) SymbolsAt(address uint64) []symbol.Symbol {
-	if i == nil {
+	if i == nil || len(i.Symbols) == 0 {
 		return nil
 	}
-	i.once.Do(func() {
-		i.byAddress = make(map[uint64][]symbol.Symbol, len(i.Symbols))
-		for _, entry := range i.Symbols {
-			i.byAddress[entry.Address] = append(i.byAddress[entry.Address], entry)
+	i.ensureSymbolIndex()
+	if i.byAddressExtra != nil {
+		if extra := i.byAddressExtra[address]; len(extra) > 0 {
+			out := make([]symbol.Symbol, len(extra))
+			for k, idx := range extra {
+				out[k] = i.Symbols[idx]
+			}
+			return out
 		}
-	})
-	return i.byAddress[address]
+	}
+	if idx, ok := i.byAddressFirst[address]; ok {
+		return []symbol.Symbol{i.Symbols[idx]}
+	}
+	return nil
 }
 
 // SymbolByName returns the first symbol with this name. A language layer keeps
@@ -165,14 +293,13 @@ func (i *Image) SymbolByName(name string) (symbol.Symbol, bool) {
 	if i == nil || name == "" {
 		return symbol.Symbol{}, false
 	}
-	for _, entry := range i.Symbols {
-		if entry.Name == name {
-			return entry, true
-		}
+	i.ensureSymbolIndex()
+	if idx, ok := i.byName[name]; ok {
+		return i.Symbols[idx], true
 	}
-	for _, entry := range i.Symbols {
-		if entry.Mangled == name {
-			return entry, true
+	if i.byMangled != nil {
+		if idx, ok := i.byMangled[name]; ok {
+			return i.Symbols[idx], true
 		}
 	}
 	return symbol.Symbol{}, false
@@ -183,5 +310,33 @@ func (i *Image) SymbolAt(address uint64) (symbol.Symbol, bool) {
 	if i == nil {
 		return symbol.Symbol{}, false
 	}
-	return symbol.At(i.Symbols, address)
+	i.ensureSymbolIndex()
+	if address != 0 {
+		if idx, ok := i.byAddressFirst[address]; ok {
+			return i.Symbols[idx], true
+		}
+	}
+	pos := sort.Search(len(i.sizedSymbols), func(idx int) bool {
+		return i.Symbols[i.sizedSymbols[idx]].Address > address
+	})
+	if pos == 0 {
+		return symbol.Symbol{}, false
+	}
+	bestIdx := int32(-1)
+	for idx := pos - 1; idx >= 0; idx-- {
+		if i.sizedMaxEnd[idx] <= address {
+			break
+		}
+		symIdx := i.sizedSymbols[idx]
+		cand := &i.Symbols[symIdx]
+		if address-cand.Address < cand.Size {
+			if bestIdx < 0 || symIdx < bestIdx {
+				bestIdx = symIdx
+			}
+		}
+	}
+	if bestIdx >= 0 {
+		return i.Symbols[bestIdx], true
+	}
+	return symbol.Symbol{}, false
 }

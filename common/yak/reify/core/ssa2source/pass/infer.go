@@ -113,6 +113,10 @@ func functionReturnsPointer(function *ssa.Function) bool {
 }
 
 func inferValue(value ssa.Value, returnPointer map[string]bool) bool {
+	return inferValueWith(value, returnPointer, nil)
+}
+
+func inferValueWith(value ssa.Value, localPtrs, sharedPtrs map[string]bool) bool {
 	changed := false
 	switch typed := value.(type) {
 	case *ssa.Call:
@@ -134,7 +138,7 @@ func inferValue(value ssa.Value, returnPointer map[string]bool) bool {
 					changed = true
 				}
 			}
-		} else if returnPointer[name] && setPointer(typed) {
+		} else if (localPtrs[name] || sharedPtrs[name]) && setPointer(typed) {
 			changed = true
 		}
 	case *ssa.BinOp:

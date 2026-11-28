@@ -45,6 +45,16 @@ type Options struct {
 	// table has to become the address it holds; otherwise every access stays
 	// symbolic and the object it names cannot be recovered.
 	PointerAt func(address uint64, size uint16) (uint64, bool)
+	// ConsumeIR clears each converted LowIR Function's Blocks and Facts in
+	// place right after converting it so multi-megabyte LowIR slices can be
+	// garbage-collected incrementally instead of coexisting with the full SSA.
+	ConsumeIR bool
+}
+
+// WithConsumeIR clears each function's LowIR Blocks and Facts immediately after
+// converting it to SSA.
+func WithConsumeIR() Option {
+	return func(options *Options) { options.ConsumeIR = true }
 }
 
 // WithProgramCache selects the program cache kind. ProgramCacheDBWrite makes
@@ -102,37 +112,97 @@ func Convert(ctx context.Context, ir *core.LowIR, options ...Option) (*Result, e
 	if settings.Language != "" {
 		program.Language = settings.Language
 	}
-	converter := &converter{
-		ctx:          ctx,
-		program:      program,
-		facts:        ir.Facts(),
-		pointerAt:    settings.PointerAt,
-		frameValues:  make(map[ssa.Value]bool),
-		spDerived:    make(map[ssa.Value]bool),
-		frameDerived: make(map[ssa.Value]bool),
-		diagnostics:  make([]core.Diagnostic, 0),
+	_, diagnostics, err := convertInto(ctx, program, ir, settings)
+	if err != nil {
+		return nil, err
 	}
+	return &Result{Program: program, Diagnostics: diagnostics}, nil
+}
+
+// ConvertInto converts LowIR functions into an existing YakSSA Program and
+// returns the newly created non-extern functions in LowIR order.
+func ConvertInto(ctx context.Context, program *ssa.Program, ir *core.LowIR, options ...Option) ([]*ssa.Function, []core.Diagnostic, error) {
+	if program == nil {
+		return nil, nil, fmt.Errorf("lowir2ssa: nil program")
+	}
+	if ir == nil {
+		return nil, nil, fmt.Errorf("lowir2ssa: nil LowIR")
+	}
+	if len(ir.Functions) == 0 {
+		return nil, nil, fmt.Errorf("lowir2ssa: LowIR has no functions")
+	}
+	settings := Options{ProgramName: program.GetProgramName(), CacheKind: program.DatabaseKind, Language: ssaconfig.General}
+	for _, option := range options {
+		option(&settings)
+	}
+	return convertInto(ctx, program, ir, settings)
+}
+
+func convertInto(ctx context.Context, program *ssa.Program, ir *core.LowIR, settings Options) ([]*ssa.Function, []core.Diagnostic, error) {
+	converter := &converter{
+		ctx:           ctx,
+		program:       program,
+		facts:         ir.Facts(),
+		pointerAt:     settings.PointerAt,
+		types:         make(map[core.ValueType]ssa.Type, 16),
+		signedTypes:   make(map[uint16]ssa.Type, 8),
+		blocks:        make(map[core.BlockID]*ssa.BasicBlock),
+		values:        make(map[core.ValueID]ssa.Value),
+		defs:          make(map[core.ValueID]core.Instruction),
+		variables:     make(map[string]*ssa.Variable),
+		memory:        make(map[string]*ssa.Variable),
+		memoryNames:   make(map[string]string),
+		functions:     make(map[string]*ssa.Function),
+		flags:         make(map[core.ValueID]flagInfo),
+		arguments:     make(map[string]bool),
+		loopHeaders:   make(map[core.BlockID]bool),
+		loopPhis:      make(map[core.BlockID]map[string]*ssa.Phi),
+		loopPhiOrder:  make(map[core.BlockID][]loopPhiRef),
+		loopPhiDone:   make(map[int64]bool),
+		headerStore:   make(map[core.BlockID]map[string]bool),
+		loopCarried:   make(map[core.BlockID][]string),
+		mergePhis:     make(map[core.BlockID]map[string]*ssa.Phi),
+		mergePhiOrder: make(map[core.BlockID][]string),
+		blockOut:      make(map[core.BlockID]map[string]ssa.Value),
+		lowirBySSA:    make(map[int64]core.BlockID),
+		undefined:     make(map[string]ssa.Value),
+		memoryValid:   make(map[string]bool),
+		memoryKind:    make(map[string]memorySlotKind),
+		frameValues:   make(map[ssa.Value]bool),
+		spDerived:     make(map[ssa.Value]bool),
+		frameDerived:  make(map[ssa.Value]bool),
+		diagnostics:   make([]core.Diagnostic, 0),
+	}
+	names := settings.LowIRPasses
+	if len(names) == 0 {
+		names = pass.DefaultNames()
+	}
+	frameCleanup := containsPass(names, "remove-stackframe")
+	converted := make([]*ssa.Function, 0, len(ir.Functions))
 	for index := range ir.Functions {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		function := ir.Functions[index]
-		names := settings.LowIRPasses
-		if len(names) == 0 {
-			names = pass.DefaultNames()
-		}
 		facts := ir.FactsFor(function)
 		if err := pass.Apply(&function, facts, names...); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		converter.facts = facts
-		function.FrameCleanup = containsPass(names, "remove-stackframe")
-		function.FrameKept = !function.FrameCleanup
+		function.FrameCleanup = frameCleanup
+		function.FrameKept = !frameCleanup
 		if err := convertFunctionSafely(converter, function); err != nil {
-			return nil, err
+			return nil, nil, err
+		}
+		if converter.function != nil {
+			converted = append(converted, converter.function)
+		}
+		if settings.ConsumeIR {
+			ir.Functions[index].Blocks = nil
+			ir.Functions[index].Facts = nil
 		}
 	}
-	return &Result{Program: program, Diagnostics: converter.diagnostics}, nil
+	return converted, converter.diagnostics, nil
 }
 
 // convertFunctionSafely turns a conversion panic into an error that names the
@@ -265,31 +335,7 @@ func (c *converter) convertFunction(function core.Function) error {
 	c.function = ssaFunction
 	c.builder = builder
 	c.entry = builder.CurrentBlock
-	c.blocks = make(map[core.BlockID]*ssa.BasicBlock, len(function.Blocks))
-	c.values = make(map[core.ValueID]ssa.Value)
-	c.defs = make(map[core.ValueID]core.Instruction)
-	c.variables = make(map[string]*ssa.Variable)
-	c.memory = make(map[string]*ssa.Variable)
-	c.memoryNames = make(map[string]string)
-	c.functions = make(map[string]*ssa.Function)
-	c.flags = make(map[core.ValueID]flagInfo)
-	c.arguments = make(map[string]bool)
-	c.loopHeaders = make(map[core.BlockID]bool)
-	c.loopPhis = make(map[core.BlockID]map[string]*ssa.Phi)
-	c.loopPhiOrder = make(map[core.BlockID][]loopPhiRef)
-	c.loopPhiDone = make(map[int64]bool)
-	c.headerStore = make(map[core.BlockID]map[string]bool)
-	c.loopCarried = make(map[core.BlockID][]string)
-	c.mergePhis = make(map[core.BlockID]map[string]*ssa.Phi)
-	c.mergePhiOrder = make(map[core.BlockID][]string)
-	c.blockOut = make(map[core.BlockID]map[string]ssa.Value)
-	c.lowirBySSA = make(map[int64]core.BlockID, len(function.Blocks))
-	c.types = make(map[core.ValueType]ssa.Type)
-	c.signedTypes = make(map[uint16]ssa.Type)
-	c.undefined = make(map[string]ssa.Value)
-	c.memoryValid = make(map[string]bool)
-	c.memoryKind = make(map[string]memorySlotKind)
-	c.frameDerived = make(map[ssa.Value]bool)
+	c.resetFunctionState()
 
 	for index, block := range function.Blocks {
 		var ssaBlock *ssa.BasicBlock
@@ -331,6 +377,47 @@ func (c *converter) convertFunction(function core.Function) error {
 	c.fillMergePhis()
 	ssaFunction.Finish()
 	return nil
+}
+
+const maxRetainedConverterMap = 4096
+
+func resetMap[K comparable, V any](m map[K]V) map[K]V {
+	if m == nil || len(m) > maxRetainedConverterMap {
+		return make(map[K]V)
+	}
+	clear(m)
+	return m
+}
+
+func (c *converter) resetFunctionState() {
+	c.blocks = resetMap(c.blocks)
+	c.blockOrder = c.blockOrder[:0]
+	c.values = resetMap(c.values)
+	c.defs = resetMap(c.defs)
+	c.variables = resetMap(c.variables)
+	c.memory = resetMap(c.memory)
+	c.memoryNames = resetMap(c.memoryNames)
+	c.memoryIndex = 0
+	c.functions = resetMap(c.functions)
+	c.flags = resetMap(c.flags)
+	c.arguments = resetMap(c.arguments)
+	c.loopHeaders = resetMap(c.loopHeaders)
+	c.loopPhis = resetMap(c.loopPhis)
+	c.loopPhiOrder = resetMap(c.loopPhiOrder)
+	c.loopPhiDone = resetMap(c.loopPhiDone)
+	c.headerStore = resetMap(c.headerStore)
+	c.loopCarried = resetMap(c.loopCarried)
+	c.mergePhis = resetMap(c.mergePhis)
+	c.mergePhiOrder = resetMap(c.mergePhiOrder)
+	c.blockOut = resetMap(c.blockOut)
+	c.lowirBySSA = resetMap(c.lowirBySSA)
+	c.undefined = resetMap(c.undefined)
+	c.memoryValid = resetMap(c.memoryValid)
+	c.memoryKind = resetMap(c.memoryKind)
+	c.stackStores = c.stackStores[:0]
+	c.frameValues = resetMap(c.frameValues)
+	c.spDerived = resetMap(c.spDerived)
+	c.frameDerived = resetMap(c.frameDerived)
 }
 
 func (c *converter) markLoopHeaders(function core.Function) {

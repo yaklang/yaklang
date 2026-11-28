@@ -14,47 +14,76 @@ func AnnotateAddresses(program *ssa.Program, stringAt func(uint64) (string, bool
 		return
 	}
 	program.Funcs.ForEach(func(_ string, function *ssa.Function) bool {
-		if function == nil || function.IsExtern() {
-			return true
-		}
-		for _, blockID := range function.Blocks {
-			block, ok := function.GetBasicBlockByID(blockID)
-			if !ok || block == nil {
-				continue
-			}
-			ids := make([]int64, 0, len(block.Insts)+len(block.Phis))
-			ids = append(ids, block.Insts...)
-			ids = append(ids, block.Phis...)
-			for _, instructionID := range ids {
-				instruction, ok := function.GetInstructionById(instructionID)
-				if !ok || instruction == nil {
-					continue
-				}
-				node, ok := ssa.ToNode(instruction)
-				if !ok || node == nil {
-					continue
-				}
-				for _, value := range node.GetValues() {
-					constant, ok := ssa.ToConstInst(value)
-					if !ok || constant == nil || constant.GetVerboseName() != "" {
-						continue
-					}
-					address, ok := addressConstant(constant)
-					if !ok {
-						continue
-					}
-					if text, ok := stringAt(address); ok {
-						constant.SetVerboseName(fmt.Sprintf("/* %q */", text))
-						continue
-					}
-					if name, ok := symbolAt(address); ok && name != "" {
-						constant.SetVerboseName("/* " + name + " */")
-					}
-				}
-			}
-		}
+		annotateFunctionAddresses(function, stringAt, symbolAt)
 		return true
 	})
+}
+
+func annotateFunctionAddresses(function *ssa.Function, stringAt func(uint64) (string, bool), symbolAt func(uint64) (string, bool)) {
+	if function == nil || function.IsExtern() {
+		return
+	}
+	for _, blockID := range function.Blocks {
+		block, ok := function.GetBasicBlockByID(blockID)
+		if !ok || block == nil {
+			continue
+		}
+		for _, instructionID := range block.Insts {
+			annotateInstructionAddresses(function, instructionID, stringAt, symbolAt)
+		}
+		for _, instructionID := range block.Phis {
+			annotateInstructionAddresses(function, instructionID, stringAt, symbolAt)
+		}
+	}
+}
+
+func annotateInstructionAddresses(function *ssa.Function, instructionID int64, stringAt func(uint64) (string, bool), symbolAt func(uint64) (string, bool)) {
+	instruction, ok := function.GetInstructionById(instructionID)
+	if !ok || instruction == nil {
+		return
+	}
+	node, ok := ssa.ToNode(instruction)
+	if !ok || node == nil {
+		return
+	}
+	for _, value := range node.GetValues() {
+		constant, ok := ssa.ToConstInst(value)
+		if !ok || constant == nil || constant.GetVerboseName() != "" {
+			continue
+		}
+		address, ok := addressConstant(constant)
+		if !ok {
+			continue
+		}
+		if text, ok := stringAt(address); ok {
+			constant.SetVerboseName(fmt.Sprintf("/* %q */", text))
+			continue
+		}
+		if name, ok := symbolAt(address); ok && name != "" {
+			constant.SetVerboseName("/* " + name + " */")
+		}
+	}
+}
+
+// AnnotateFunctions attaches string and symbol comments to only the provided functions.
+func AnnotateFunctions(functions []*ssa.Function, artifact *core.Artifact) {
+	if len(functions) == 0 || artifact == nil {
+		return
+	}
+	stringAt := func(address uint64) (string, bool) { return artifact.StringAt(address, 128) }
+	symbolAt := func(address uint64) (string, bool) {
+		if artifact.Image == nil {
+			return "", false
+		}
+		symbol, ok := artifact.Image.SymbolAt(address)
+		if !ok {
+			return "", false
+		}
+		return symbol.Name, symbol.Name != ""
+	}
+	for _, fn := range functions {
+		annotateFunctionAddresses(fn, stringAt, symbolAt)
+	}
 }
 
 func addressConstant(constant *ssa.ConstInst) (uint64, bool) {

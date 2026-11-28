@@ -187,3 +187,76 @@ func normalizeIndent(text string) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+func TestConvertResetsConverterStateBetweenFunctions(t *testing.T) {
+	irText := `target: linux/amd64 (64-bit, little-endian)
+frame: sp=rsp fp=rbp flags=rflags saved=rbp,rbx,r12,r13,r14,r15 growth=-1
+registers: naming=x86 width=64 flags=rflags flags_width=64 args=rdi,rsi,rdx,rcx,r8,r9 return=rax
+function fn_one @ 0x1000
+block b1 @ 0x1000
+  0x1000  v1:i1 = constant 0x1
+  0x1001  branch v1 -> b2, b3
+block b2 @ 0x1010
+  0x1010  v2:i64 = constant 0xa
+  0x1011  write_register %rax, v2
+  0x1012  jump -> b4
+block b3 @ 0x1020
+  0x1020  v3:i64 = constant 0x14
+  0x1021  write_register %rax, v3
+  0x1022  jump -> b4
+block b4 @ 0x1030
+  0x1030  v4:i64 = read_register %rax
+  0x1031  return v4
+function fn_two @ 0x2000
+block b5 @ 0x2000
+  0x2000  v5:i1 = constant 0x1
+  0x2001  branch v5 -> b6, b7
+block b6 @ 0x2010
+  0x2010  v6:i64 = constant 0x1e
+  0x2011  write_register %rax, v6
+  0x2012  jump -> b8
+block b7 @ 0x2020
+  0x2020  v7:i64 = constant 0x28
+  0x2021  write_register %rax, v7
+  0x2022  jump -> b8
+block b8 @ 0x2030
+  0x2030  v8:i64 = read_register %rax
+  0x2031  return v8`
+	ir, err := lowirtext.Parse(irText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Convert(context.Background(), ir, WithConsumeIR())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, fn := range ir.Functions {
+		if fn.Blocks != nil || fn.Facts != nil {
+			t.Fatalf("WithConsumeIR did not release function %d", i)
+		}
+	}
+	for _, fn := range res.Program.Funcs.Values() {
+		if fn == nil || fn.IsExtern() {
+			continue
+		}
+		for _, bid := range fn.Blocks {
+			blk, ok := fn.GetBasicBlockByID(bid)
+			if !ok || blk == nil {
+				continue
+			}
+			for _, pid := range blk.Phis {
+				inst, ok := fn.GetInstructionById(pid)
+				if !ok {
+					continue
+				}
+				phi, ok := ssa.ToPhi(inst)
+				if !ok {
+					continue
+				}
+				if len(phi.Edge) != len(blk.Preds) {
+					t.Fatalf("fn %s phi %d edges=%d != preds=%d", fn.GetName(), pid, len(phi.Edge), len(blk.Preds))
+				}
+			}
+		}
+	}
+}

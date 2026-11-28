@@ -8,6 +8,7 @@ package ssa2source
 import (
 	"context"
 	"fmt"
+	"io"
 	"regexp"
 	"sort"
 	"strconv"
@@ -19,9 +20,21 @@ import (
 )
 
 // Render converts a YakSSA program into source-like text.
-func Render(ctx context.Context, program *ssa.Program) (source string, err error) {
+func Render(ctx context.Context, program *ssa.Program) (string, error) {
 	if program == nil {
 		return "", fmt.Errorf("ssa2source: nil program")
+	}
+	var output strings.Builder
+	if err := RenderTo(ctx, &output, program); err != nil {
+		return "", err
+	}
+	return output.String(), nil
+}
+
+// RenderTo streams source-like pseudocode for every non-extern function in program into w.
+func RenderTo(ctx context.Context, w io.Writer, program *ssa.Program) (err error) {
+	if program == nil {
+		return fmt.Errorf("ssa2source: nil program")
 	}
 	defer func() {
 		recovered := recover()
@@ -30,36 +43,53 @@ func Render(ctx context.Context, program *ssa.Program) (source string, err error
 		}
 		// Rendering is diagnostic output. A malformed program must produce an
 		// error the caller can print, not a crash of the whole process.
-		source, err = "", fmt.Errorf("ssa2source: render panic: %v", recovered)
+		err = fmt.Errorf("ssa2source: render panic: %v", recovered)
 	}()
-	var output strings.Builder
 	var renderErr error
+	var text strings.Builder
 	program.Funcs.ForEach(func(_ string, function *ssa.Function) bool {
-		if err := ctx.Err(); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			renderErr = ctxErr
+			return false
+		}
+		if err := renderOneFunction(w, &text, function); err != nil {
 			renderErr = err
 			return false
 		}
-		if function == nil || function.IsExtern() {
-			return true
-		}
-		if strings.Contains(function.GetVerboseName(), "boundary: plt") {
-			return true
-		}
-		var text strings.Builder
-		renderFunction(&text, function)
-		cleaned, err := cleanSource(function, text.String())
-		if err != nil {
-			renderErr = err
-			return false
-		}
-		output.WriteString(renumberSource(function, cleaned))
-		output.WriteByte('\n')
 		return true
 	})
-	if renderErr != nil {
-		return "", renderErr
+	return renderErr
+}
+
+// RenderFunctionTo renders a single YakSSA function as source-like text into w.
+func RenderFunctionTo(w io.Writer, function *ssa.Function) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("ssa2source: render panic: %v", recovered)
+		}
+	}()
+	var text strings.Builder
+	return renderOneFunction(w, &text, function)
+}
+
+func renderOneFunction(w io.Writer, text *strings.Builder, function *ssa.Function) error {
+	if function == nil || function.IsExtern() {
+		return nil
 	}
-	return output.String(), nil
+	if strings.Contains(function.GetVerboseName(), "boundary: plt") {
+		return nil
+	}
+	text.Reset()
+	renderFunction(text, function)
+	cleaned, err := cleanSource(function, text.String())
+	if err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, renumberSource(function, cleaned)); err != nil {
+		return err
+	}
+	_, err = io.WriteString(w, "\n")
+	return err
 }
 
 var sourceValueID = regexp.MustCompile(`\bv(\d+)\b`)
@@ -222,33 +252,15 @@ func cleanSource(function *ssa.Function, text string) (string, error) {
 		}
 		filtered = append(filtered, line)
 	}
-	filteredText := strings.Join(filtered, "\n")
-	lines = strings.Split(filteredText, "\n")
+	lines = filtered
 	// A value that is referenced before its defining block is declared up front.
 	// This keeps the textual source well-formed when an irreducible/loop-heavy
 	// CFG cannot be printed in strict definition order.
-	definedAt := make(map[int64]int)
-	for index, line := range lines {
-		if match := sourceAssignment.FindStringSubmatch(line); match != nil {
-			id, _ := strconv.ParseInt(match[1], 10, 64)
-			if _, exists := definedAt[id]; !exists {
-				definedAt[id] = index
-			}
-		}
-	}
-	forwardIDs := make(map[int64]bool)
-	for index, line := range lines {
-		for _, ref := range sourceValue.FindAllStringSubmatch(line, -1) {
-			id, _ := strconv.ParseInt(ref[1], 10, 64)
-			if defIndex, ok := definedAt[id]; ok && defIndex > index {
-				forwardIDs[id] = true
-			}
-		}
-	}
 	declaredIDs := make(map[int64]bool)
 	insertAt := 0
 	for index, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "function ") && strings.HasSuffix(strings.TrimSpace(line), "{") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasSuffix(trimmed, "{") && (strings.HasPrefix(trimmed, "function ") || strings.HasSuffix(trimmed, ") {")) {
 			insertAt = index + 1
 			break
 		}
@@ -299,9 +311,8 @@ func cleanSource(function *ssa.Function, text string) (string, error) {
 		sort.Strings(declarations)
 		lines = append(lines[:insertAt], append(declarations, lines[insertAt:]...)...)
 		insertAt += len(declarations)
-		filteredText = strings.Join(lines, "\n")
 	}
-	lines = strings.Split(filteredText, "\n")
+	filteredText := strings.Join(lines, "\n")
 	definitions = make(map[int64]int)
 	params := make(map[int64]bool)
 	for _, id := range function.Params {
@@ -361,10 +372,12 @@ func inlineFrameBaseAliases(lines []string) []string {
 		return lines
 	}
 	for index, line := range filtered {
-		for from, to := range replacements {
-			line = strings.ReplaceAll(line, from, to)
-		}
-		filtered[index] = line
+		filtered[index] = sourceValue.ReplaceAllStringFunc(line, func(token string) string {
+			if to, ok := replacements[token]; ok {
+				return to
+			}
+			return token
+		})
 	}
 	return filtered
 }
@@ -396,16 +409,24 @@ func pruneUnusedParameters(lines []string) []string {
 	if len(params) == 1 && strings.TrimSpace(params[0]) == "void" {
 		return lines
 	}
-	body := strings.Join(lines[headerIndex+1:], "\n")
+	usedIdents := collectIdentifiersFromLines(lines[headerIndex+1:])
+	var body string
 	kept := make([]string, 0, len(params))
 	for _, param := range params {
 		fields := strings.Fields(param)
 		if len(fields) == 0 {
 			continue
 		}
-		name := regexp.QuoteMeta(fields[len(fields)-1])
-		if regexp.MustCompile(`\b` + name + `\b`).MatchString(body) {
+		name := fields[len(fields)-1]
+		if usedIdents[name] {
 			kept = append(kept, param)
+		} else if !isWordString(name) {
+			if body == "" {
+				body = strings.Join(lines[headerIndex+1:], "\n")
+			}
+			if regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\b`).MatchString(body) {
+				kept = append(kept, param)
+			}
 		}
 	}
 	if len(kept) == 0 {
@@ -413,6 +434,42 @@ func pruneUnusedParameters(lines []string) []string {
 	}
 	lines[headerIndex] = header[:open+1] + strings.Join(kept, ", ") + header[closing:]
 	return lines
+}
+
+func isWordString(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+func collectIdentifiersFromLines(lines []string) map[string]bool {
+	found := make(map[string]bool)
+	for _, text := range lines {
+		start := -1
+		for i := 0; i <= len(text); i++ {
+			word := false
+			if i < len(text) {
+				c := text[i]
+				word = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'
+			}
+			if word {
+				if start < 0 {
+					start = i
+				}
+			} else if start >= 0 {
+				found[text[start:i]] = true
+				start = -1
+			}
+		}
+	}
+	return found
 }
 
 // matchingOpenParen returns the '(' that matches the ')' at close. A function

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -226,7 +227,7 @@ func (e *commandEnv) inspect(c *cli.Context) error {
 	fmt.Fprintf(&text, "Input: %q\nSize: %d bytes\nLoader: %s\nFormat: %s\n", artifact.Origin.Name, artifact.Origin.Size, artifact.Loader.Name(), artifact.Format)
 	fmt.Fprintf(&text, "Target: %s\n", targetSummary(artifact.Target))
 	fmt.Fprintf(&text, "Parser: %s\n", parserSummary(parser))
-	writeLanguage(&text, artifact.Language)
+	reify.WriteLanguage(&text, artifact.Language)
 	if image := artifact.Image; image != nil {
 		fmt.Fprintf(&text, "Object: %s\n", image.ObjectType)
 		if entry, present := image.EntryPoint(); present {
@@ -282,7 +283,7 @@ func (e *commandEnv) strings(c *cli.Context) error {
 	var text bytes.Buffer
 	fmt.Fprintf(&text, "Scope: one string\n")
 	fmt.Fprintf(&text, "Input: %q\n", artifact.Origin.Name)
-	writeLanguage(&text, artifact.Language)
+	reify.WriteLanguage(&text, artifact.Language)
 	fmt.Fprintf(&text, "Address: 0x%x\n", address)
 	fmt.Fprintf(&text, "Value: %q\n", value)
 	_, err = io.Copy(e.stdout, &text)
@@ -388,23 +389,13 @@ func (e *commandEnv) save(c *cli.Context) error {
 		return err
 	}
 	staged := "reify-staging-" + uuid.NewString()
-	options = append(options,
-		reify.WithProgramName(staged),
-		reify.WithProgramCache(ssa.ProgramCacheDBWrite),
-	)
-	result, err := reify.Lift(e.ctx, c.Args().First(), options...)
+	options = append(options, reify.WithProgramName(staged))
+	result, err := reify.Save(e.ctx, c.Args().First(), staged, options...)
 	if err != nil {
 		return discardStagedProgram(nil, staged, err)
 	}
-	defer func() { _ = result.Close() }()
-	if result.Program == nil {
-		return discardStagedProgram(nil, staged, cli.NewExitError("save produced no SSA program", 1))
-	}
-	if err := result.Program.SaveToDatabase(); err != nil {
-		return discardStagedProgram(result.Program, staged, err)
-	}
 	if err := ssadb.FinalizeStagedProgramChecked(ssadb.GetDB(), staged, name, replace); err != nil {
-		return discardStagedProgram(result.Program, staged, err)
+		return discardStagedProgram(nil, staged, err)
 	}
 	fmt.Fprintf(e.stdout, "Program: %s\n", name)
 	fmt.Fprintf(e.stdout, "Functions: %d\n", result.Functions)
@@ -528,6 +519,7 @@ func (e *commandEnv) audit(c *cli.Context) error {
 		if optionErr != nil {
 			return optionErr
 		}
+		options = append(options, reify.WithDiscardIR(), reify.WithSkipText())
 		lifted, liftErr := reify.Lift(e.ctx, file, options...)
 		if liftErr != nil {
 			return liftErr
@@ -566,6 +558,52 @@ func (e *commandEnv) lift(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	if !c.Bool("json") && mode != reify.ModeAll {
+		bw := bufio.NewWriterSize(e.stdout, 256*1024)
+		streamOptions := append([]reify.Option(nil), options...)
+		streamOptions = append(streamOptions, reify.WithBeforeStream(func(w io.Writer, header reify.StreamHeader) error {
+			arch := string(header.Target.Architecture)
+			switch header.Mode {
+			case reify.ModeASM:
+				fmt.Fprintf(w, "Scope: %s assembly\n", arch)
+			case reify.ModeLowIR:
+				fmt.Fprintf(w, "Scope: %s LowIR\n", arch)
+			case reify.ModeSSAIR:
+				fmt.Fprintf(w, "Scope: %s SSair\n", arch)
+			case reify.ModeSource:
+				fmt.Fprintf(w, "Scope: %s source\n", arch)
+			}
+			fmt.Fprintf(w, "Region: address=0x%x size=%d\n", header.Region.Address, header.Region.Size)
+			if header.Mode != reify.ModeASM {
+				reify.WriteBoundaryStats(w, header.BoundaryStats)
+			}
+			return nil
+		}))
+		streamed, err := reify.LiftStream(e.ctx, c.Args().First(), bw, streamOptions...)
+		if err != nil {
+			return err
+		}
+		switch streamed.Mode {
+		case reify.ModeASM:
+			fmt.Fprintf(bw, "Instructions: %d\n", streamed.Instructions)
+			fmt.Fprintf(bw, "Diagnostics: %d\n", len(streamed.Diagnostics))
+		case reify.ModeLowIR:
+			fmt.Fprintf(bw, "Functions: %d\n", streamed.Functions)
+			fmt.Fprintf(bw, "Blocks: %d\n", streamed.Blocks)
+			fmt.Fprintf(bw, "Instructions: %d\n", streamed.Instructions)
+			fmt.Fprintf(bw, "Values: %d\n", streamed.Values)
+			fmt.Fprintf(bw, "Diagnostics: %d\n", len(streamed.Diagnostics))
+		case reify.ModeSSAIR, reify.ModeSource:
+			fmt.Fprintf(bw, "Functions: %d\n", streamed.Functions)
+			fmt.Fprintf(bw, "Diagnostics: %d\n", len(streamed.Diagnostics))
+		}
+		reify.WriteLanguage(bw, streamed.Language)
+		for _, diagnostic := range streamed.Diagnostics {
+			fmt.Fprintf(bw, "Note [%s]: %s\n", diagnostic.Code, diagnostic.Message)
+		}
+		return bw.Flush()
+	}
+
 	result, err := reify.Lift(e.ctx, c.Args().First(), options...)
 	if err != nil {
 		return err
@@ -587,8 +625,11 @@ func (e *commandEnv) lift(c *cli.Context) error {
 	if c.Bool("json") {
 		return writeJSON(e.stdout, report)
 	}
-	_, err = io.Copy(e.stdout, liftText(result))
-	return err
+	bw := bufio.NewWriterSize(e.stdout, 256*1024)
+	if err := writeLiftText(bw, result); err != nil {
+		return err
+	}
+	return bw.Flush()
 }
 
 func scopeFor(result *reify.Result, mode reify.Mode) string {
@@ -611,96 +652,70 @@ var modeScopeSuffix = map[reify.Mode]string{
 	reify.ModeAll:    "all",
 }
 
-func liftText(result *reify.Result) io.Reader {
-	var text bytes.Buffer
+func writeLiftText(w io.Writer, result *reify.Result) error {
 	arch := string(result.Artifact.Target.Architecture)
 	switch result.Mode {
 	case reify.ModeASM:
-		fmt.Fprintf(&text, "Scope: %s assembly\n", arch)
-		fmt.Fprintf(&text, "Region: address=0x%x size=%d\n", result.Region.Address, result.Region.Size)
-		fmt.Fprintf(&text, "Instructions: %d\n", result.Instructions)
-		fmt.Fprintf(&text, "Diagnostics: %d\n", len(result.Diagnostics))
-		text.WriteString(result.Assembly)
+		fmt.Fprintf(w, "Scope: %s assembly\n", arch)
+		fmt.Fprintf(w, "Region: address=0x%x size=%d\n", result.Region.Address, result.Region.Size)
+		fmt.Fprintf(w, "Instructions: %d\n", result.Instructions)
+		fmt.Fprintf(w, "Diagnostics: %d\n", len(result.Diagnostics))
+		if _, err := io.WriteString(w, result.Assembly); err != nil {
+			return err
+		}
 	case reify.ModeLowIR:
-		fmt.Fprintf(&text, "Scope: %s LowIR\n", arch)
-		fmt.Fprintf(&text, "Region: address=0x%x size=%d\n", result.Region.Address, result.Region.Size)
-		fmt.Fprintf(&text, "Functions: %d\n", result.Functions)
-		fmt.Fprintf(&text, "Blocks: %d\n", result.Blocks)
-		fmt.Fprintf(&text, "Instructions: %d\n", result.Instructions)
-		fmt.Fprintf(&text, "Values: %d\n", result.Values)
-		fmt.Fprintf(&text, "Diagnostics: %d\n", len(result.Diagnostics))
-		writeBoundaryStats(&text, result.BoundaryStats)
-		text.WriteString(lowirtext.Format(result.IR))
+		fmt.Fprintf(w, "Scope: %s LowIR\n", arch)
+		fmt.Fprintf(w, "Region: address=0x%x size=%d\n", result.Region.Address, result.Region.Size)
+		fmt.Fprintf(w, "Functions: %d\n", result.Functions)
+		fmt.Fprintf(w, "Blocks: %d\n", result.Blocks)
+		fmt.Fprintf(w, "Instructions: %d\n", result.Instructions)
+		fmt.Fprintf(w, "Values: %d\n", result.Values)
+		fmt.Fprintf(w, "Diagnostics: %d\n", len(result.Diagnostics))
+		reify.WriteBoundaryStats(w, result.BoundaryStats)
+		if err := lowirtext.FormatTo(w, result.IR); err != nil {
+			return err
+		}
 	case reify.ModeSSAIR, reify.ModeSource:
 		if result.Mode == reify.ModeSSAIR {
-			fmt.Fprintf(&text, "Scope: %s SSair\n", arch)
+			fmt.Fprintf(w, "Scope: %s SSair\n", arch)
 		} else {
-			fmt.Fprintf(&text, "Scope: %s source\n", arch)
+			fmt.Fprintf(w, "Scope: %s source\n", arch)
 		}
-		fmt.Fprintf(&text, "Region: address=0x%x size=%d\n", result.Region.Address, result.Region.Size)
-		fmt.Fprintf(&text, "Functions: %d\n", result.Functions)
-		fmt.Fprintf(&text, "Diagnostics: %d\n", len(result.Diagnostics))
-		writeBoundaryStats(&text, result.BoundaryStats)
+		fmt.Fprintf(w, "Region: address=0x%x size=%d\n", result.Region.Address, result.Region.Size)
+		fmt.Fprintf(w, "Functions: %d\n", result.Functions)
+		fmt.Fprintf(w, "Diagnostics: %d\n", len(result.Diagnostics))
+		reify.WriteBoundaryStats(w, result.BoundaryStats)
+		body := result.Source
 		if result.Mode == reify.ModeSSAIR {
-			text.WriteString(result.SSAIR)
-		} else {
-			text.WriteString(result.Source)
+			body = result.SSAIR
+		}
+		if _, err := io.WriteString(w, body); err != nil {
+			return err
 		}
 	default:
-		fmt.Fprintf(&text, "Scope: %s all\n", arch)
-		fmt.Fprintf(&text, "Region: address=0x%x size=%d\n", result.Region.Address, result.Region.Size)
-		fmt.Fprintf(&text, "Functions: %d\n", result.Functions)
-		fmt.Fprintf(&text, "Diagnostics: %d\n", len(result.Diagnostics))
-		writeBoundaryStats(&text, result.BoundaryStats)
-		fmt.Fprintf(&text, "===== 1asm =====\n%s", result.Assembly)
-		if result.Assembly != "" && !bytes.HasSuffix([]byte(result.Assembly), []byte("\n")) {
-			text.WriteByte('\n')
+		fmt.Fprintf(w, "Scope: %s all\n", arch)
+		fmt.Fprintf(w, "Region: address=0x%x size=%d\n", result.Region.Address, result.Region.Size)
+		fmt.Fprintf(w, "Functions: %d\n", result.Functions)
+		fmt.Fprintf(w, "Diagnostics: %d\n", len(result.Diagnostics))
+		reify.WriteBoundaryStats(w, result.BoundaryStats)
+		fmt.Fprintf(w, "===== 1asm =====\n%s", result.Assembly)
+		if result.Assembly != "" && !strings.HasSuffix(result.Assembly, "\n") {
+			if _, err := io.WriteString(w, "\n"); err != nil {
+				return err
+			}
 		}
-		fmt.Fprintf(&text, "===== 2lowir =====\n%s", lowirtext.Format(result.IR))
-		fmt.Fprintf(&text, "===== 3ssair =====\n%s", result.SSAIR)
-		fmt.Fprintf(&text, "===== 4source =====\n%s", result.Source)
+		if _, err := io.WriteString(w, "===== 2lowir =====\n"); err != nil {
+			return err
+		}
+		if err := lowirtext.FormatTo(w, result.IR); err != nil {
+			return err
+		}
+		fmt.Fprintf(w, "===== 3ssair =====\n%s", result.SSAIR)
+		fmt.Fprintf(w, "===== 4source =====\n%s", result.Source)
 	}
-	writeLanguage(&text, result.Artifact.Language)
+	reify.WriteLanguage(w, result.Artifact.Language)
 	for _, diagnostic := range result.Diagnostics {
-		fmt.Fprintf(&text, "Note [%s]: %s\n", diagnostic.Code, diagnostic.Message)
+		fmt.Fprintf(w, "Note [%s]: %s\n", diagnostic.Code, diagnostic.Message)
 	}
-	return &text
-}
-
-func writeLanguage(w io.Writer, report *core.LanguageReport) {
-	if report == nil {
-		return
-	}
-	fmt.Fprintf(w, "Language: %s (%s)\n", report.Language, report.Confidence)
-	if report.Runtime != "" {
-		fmt.Fprintf(w, "Compiler: %s\n", report.Runtime)
-	}
-	for _, evidence := range report.Evidence {
-		fmt.Fprintf(w, "Evidence [%s]: %s\n", evidence.Source, evidence.Detail)
-	}
-	if abi := report.ABI; abi != nil {
-		parts := []string{fmt.Sprintf("%d argument registers", len(abi.Registers.Arguments))}
-		if abi.Registers.Return != "" {
-			parts = append(parts, "return "+abi.Registers.Return)
-		}
-		if abi.NoCalleeSave {
-			parts = append(parts, "no callee-saved")
-		}
-		fmt.Fprintf(w, "ABI: language override (%s)\n", strings.Join(parts, ", "))
-	}
-	if model := report.Strings; model != nil {
-		termination := "length-delimited"
-		if model.Layout == core.StringLayoutNulTerminated {
-			termination = "nul-terminated"
-		}
-		fmt.Fprintf(w, "Strings: %s (%s, %s)\n", model.Layout, model.Encoding, termination)
-	}
-}
-
-func writeBoundaryStats(text *bytes.Buffer, stats *core.BoundaryStats) {
-	if stats == nil {
-		return
-	}
-	fmt.Fprintf(text, "Boundaries: symbol=%d eh_frame=%d function_start=%d init_array=%d plt=%d entry=%d call_target=%d scan=%d duplicates=%d\n",
-		stats.Symbol, stats.EHFrame, stats.FunctionStart, stats.InitArray, stats.PLT, stats.Entry, stats.Call, stats.Scan, stats.Duplicates)
+	return nil
 }
