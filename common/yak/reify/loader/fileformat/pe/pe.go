@@ -340,15 +340,24 @@ func uniqueAddresses(addresses []uint64) []uint64 {
 }
 
 func peReadRVA(reader *core.ByteReader, file *pe.File, rva, size uint32) ([]byte, error) {
+	if reader == nil {
+		return nil, fmt.Errorf("PE RVA 0x%x has no backing reader", rva)
+	}
 	for _, section := range file.Sections {
-		if rva < section.VirtualAddress || rva-section.VirtualAddress >= section.VirtualSize {
+		virtSize := max(section.VirtualSize, section.Size)
+		if rva < section.VirtualAddress || rva-section.VirtualAddress >= virtSize {
 			continue
 		}
 		delta := rva - section.VirtualAddress
 		if section.Offset == 0 || delta >= section.Size || size == 0 {
 			return nil, fmt.Errorf("PE RVA 0x%x has no file data", rva)
 		}
-		return reader.Bytes(uint64(section.Offset)+uint64(delta), uint64(min(size, section.Size-delta)))
+		fileOffset := uint64(section.Offset) + uint64(delta)
+		if reader.Size() <= 0 || fileOffset >= uint64(reader.Size()) {
+			return nil, fmt.Errorf("PE RVA 0x%x exceeds file size", rva)
+		}
+		avail := min(uint64(size), uint64(section.Size-delta), uint64(reader.Size())-fileOffset)
+		return reader.Bytes(fileOffset, avail)
 	}
 	return nil, fmt.Errorf("PE RVA 0x%x is not in a section", rva)
 }

@@ -221,3 +221,24 @@ func TestLoadLaysSectionsOut(t *testing.T) {
 		t.Fatalf("sections overlap: %#x and %#x", first, other)
 	}
 }
+
+func TestLoadRejectsMalformedSymbolTableHeaders(t *testing.T) {
+	t.Run("huge_symbol_count", func(t *testing.T) {
+		raw := object()
+		binary.LittleEndian.PutUint32(raw[12:], 0xffffffff)
+		_, err := Loader{}.Load(context.Background(), readerFor(t, raw))
+		if err == nil || !strings.Contains(err.Error(), "coff: invalid symbol table") {
+			t.Fatalf("expected invalid symbol table error, got %v", err)
+		}
+	})
+
+	t.Run("missing_symbol_table_offset", func(t *testing.T) {
+		raw := object()
+		binary.LittleEndian.PutUint32(raw[8:], 0)
+		binary.LittleEndian.PutUint32(raw[12:], 1)
+		_, err := Loader{}.Load(context.Background(), readerFor(t, raw))
+		if err == nil || !strings.Contains(err.Error(), "coff: missing symbol table offset") {
+			t.Fatalf("expected missing symbol table offset error, got %v", err)
+		}
+	})
+}

@@ -273,6 +273,50 @@ func TestPEReadRVAStaysWithinRawSection(t *testing.T) {
 	if _, err := peReadRVA(reader, file, end, 4); err == nil {
 		t.Fatal("expected an error for the zero-filled virtual tail")
 	}
+	if _, err := peReadRVA(nil, file, section.VirtualAddress, 4); err == nil {
+		t.Fatal("expected an error for a nil reader")
+	}
+
+	truncated := append([]byte(nil), raw[:fixtureExportFile+8]...)
+	truncReader := newReader(t, truncated)
+	truncFile, err := pe.NewFile(truncReader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer truncFile.Close()
+	clamped, err := peReadRVA(truncReader, truncFile, fixtureExportRVA, 16)
+	if err != nil || len(clamped) != 8 {
+		t.Fatalf("expected 8 EOF-clamped bytes, got %d bytes and error %v", len(clamped), err)
+	}
+	if _, err := peReadRVA(truncReader, truncFile, fixtureExportRVA+8, 4); err == nil {
+		t.Fatal("expected an error past EOF")
+	}
+}
+
+func TestLoadPEExportsIgnoresOverflowAndTruncatedTables(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		count uint32
+	}{
+		{name: "uint32_size_overflow", count: 0x40000001},
+		{name: "truncated_name_pointer_table", count: 128},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := fixture(t, fixtureOptions{exports: true})
+			// IMAGE_EXPORT_DIRECTORY.NumberOfFunctions (+20) and NumberOfNames (+24).
+			binary.LittleEndian.PutUint32(raw[fixtureExportFile+20:], tc.count)
+			binary.LittleEndian.PutUint32(raw[fixtureExportFile+24:], tc.count)
+			artifact, err := (Loader{}).Load(context.Background(), newReader(t, raw))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, symbol := range artifact.Image.Symbols {
+				if symbol.Name == "exported_add" {
+					t.Fatalf("expected malformed exports to be ignored, got %+v", artifact.Image.Symbols)
+				}
+			}
+		})
+	}
 }
 
 func TestLoadPEImports(t *testing.T) {

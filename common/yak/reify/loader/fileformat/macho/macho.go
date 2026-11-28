@@ -190,7 +190,7 @@ func inspectMachO(reader *core.ByteReader) (*core.Image, core.Target, *core.Boun
 				continue
 			}
 			kind := sym.SymbolObject
-			if section.Flags&(machoAttrPureInstructions|machoAttrSomeInstructions) != 0 {
+			if section.FileSize > 0 && section.Flags&(machoAttrPureInstructions|machoAttrSomeInstructions) != 0 {
 				kind = sym.SymbolFunction
 			}
 			image.Symbols = append(image.Symbols, sym.Symbol{

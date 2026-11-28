@@ -388,6 +388,10 @@ func addressRegion(artifact *core.Artifact, addressText, sizeText string) (core.
 		if symbol.Imported {
 			return core.Region{}, fmt.Errorf("function %q has no local body", name)
 		}
+		address := symbol.Address
+		if symbol.Kind == sym.SymbolFunction && artifact.Target.Architecture == core.ArchARM {
+			address &^= 1
+		}
 		size := symbol.Size
 		if sizeText != "" {
 			parsed, err := strconv.ParseUint(sizeText, 0, 64)
@@ -398,12 +402,16 @@ func addressRegion(artifact *core.Artifact, addressText, sizeText string) (core.
 		} else if size == 0 {
 			// Mach-O symbol entries carry no size. The next symbol in the same
 			// section bounds the function, and the section end bounds the last one.
-			size = inferredSymbolSize(artifact, symbol)
+			if address == symbol.Address {
+				size = inferredSymbolSize(artifact, symbol)
+			} else {
+				size = inferredAlignedSymbolSize(artifact, address)
+			}
 		}
 		if size == 0 {
 			return core.Region{}, fmt.Errorf("function %q has an empty range", name)
 		}
-		return artifact.RegionAt(symbol.Address, size)
+		return artifact.RegionAt(address, size)
 	}
 	return core.Region{}, fmt.Errorf("symbol %q does not exist", name)
 }
@@ -416,6 +424,40 @@ func inferredSymbolSize(artifact *core.Artifact, symbol sym.Symbol) uint64 {
 		return 0
 	}
 	return artifact.Image.InferredSymbolSize(symbol)
+}
+
+func inferredAlignedSymbolSize(artifact *core.Artifact, address uint64) uint64 {
+	if artifact == nil || artifact.Image == nil {
+		return 0
+	}
+	section, ok := artifact.Image.SectionAt(address)
+	if !ok {
+		return 0
+	}
+	limit := section.VirtualAddress + section.FileSize
+	if limit <= address {
+		limit = section.VirtualAddress + section.MemorySize
+	}
+	next := limit
+	for _, other := range artifact.Image.Symbols {
+		if other.Imported {
+			continue
+		}
+		otherAddr := other.Address
+		if other.Kind == sym.SymbolFunction && artifact.Target.Architecture == core.ArchARM {
+			otherAddr &^= 1
+		}
+		if otherAddr <= address || otherAddr-section.VirtualAddress >= section.MemorySize {
+			continue
+		}
+		if otherAddr < next {
+			next = otherAddr
+		}
+	}
+	if next <= address {
+		return 0
+	}
+	return next - address
 }
 
 func displayRegion(artifact *core.Artifact, settings Config) core.Region {
