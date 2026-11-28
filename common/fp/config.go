@@ -83,6 +83,9 @@ type Config struct {
 	// 禁用专门的 Web 指纹扫描
 	DisableWebFingerprint bool
 
+	// PreferVerifiedHTTP allows asset inventory to use a confirmed plaintext HTTP response without inspecting TLS.
+	PreferVerifiedHTTP bool
+
 	// 这个选项标志着，如果 Web 指纹检测中途已经检测出了某些指纹，也应该继续检测其他指纹
 	WebFingerprintUseAllRules bool
 
@@ -723,6 +726,12 @@ func WithFingerprintRule(rules map[*NmapProbe][]*NmapMatch) ConfigOption {
 func WithDisableWebFingerprint(t bool) ConfigOption {
 	return func(config *Config) {
 		config.DisableWebFingerprint = t
+	}
+}
+
+func WithPreferVerifiedHTTP(enabled bool) ConfigOption {
+	return func(config *Config) {
+		config.PreferVerifiedHTTP = enabled
 	}
 }
 

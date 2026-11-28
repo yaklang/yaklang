@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
@@ -105,15 +106,21 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 
 	cacheProto := fingerprintCacheProto(proto, config)
 	cacheKey := fingerprintCacheAddr(host, port, cacheProto)
+	legacyCacheKey := addr
+	if config.PreferVerifiedHTTP {
+		// Inventory results can omit TLS certificates, so they need their own cache entries.
+		cacheKey = "verified-http/" + cacheKey
+		legacyCacheKey = ""
+	}
 	if config.EnableCache {
-		if result := cachedMatchResult(GetMatchResultCache, cacheKey, addr, cacheProto); result != nil {
+		if result := cachedMatchResult(GetMatchResultCache, cacheKey, legacyCacheKey, cacheProto); result != nil {
 			f.reportFinished(result)
 			return result, nil
 		}
 	}
 
 	if config.EnableDatabaseCache {
-		if result := cachedMatchResult(GetMatchResultDatabaseCache, cacheKey, addr, cacheProto); result != nil {
+		if result := cachedMatchResult(GetMatchResultDatabaseCache, cacheKey, legacyCacheKey, cacheProto); result != nil {
 			f.reportFinished(result)
 			return result, nil
 		}
@@ -136,7 +143,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 	f.log("try to parse ip from host: %v", host)
 	if ip == nil {
 		f.log("found host:%s is a domain, resolve it to ip", host)
-		ipStr := netx.LookupFirst(host, netx.WithTimeout(config.ProbeTimeout))
+		ipStr := netx.LookupFirstWithContext(ctx, host, netx.WithTimeout(config.ProbeTimeout))
 		if ipStr == "" {
 			f.log("resolve %v failed: no available ip", host)
 			dataErr := errors.Errorf("resolve %s failed: %s", host, "no available ip")
@@ -218,7 +225,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 		serviceName := result.GetServiceName()
 		f.log("service name detected: %v", serviceName)
 
-		if f.Config.DisableWebFingerprint || result.GetProto() == UDP || config.CanOnlyScanUDP() {
+		if ctx.Err() != nil || f.Config.DisableWebFingerprint || result.GetProto() == UDP || config.CanOnlyScanUDP() {
 			return result, nil
 		}
 
@@ -264,16 +271,20 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 		return nil, err
 	}
 
-	// if port open, check tls...
-	if matchResult.State == OPEN && matchResult.Fingerprint != nil && matchResult.GetProto() != UDP && (len(matchResult.Fingerprint.TLSInspectResults) == 0 && !matchResult.Fingerprint.CheckedTLS) {
+	fingerprint := matchResult.Fingerprint
+	verifiedHTTP := config.PreferVerifiedHTTP && fingerprint != nil && fingerprint.confirmedPlainHTTP && len(fingerprint.HttpFlows) > 0
+	if ctx.Err() == nil && matchResult.State == OPEN && fingerprint != nil && matchResult.GetProto() != UDP && !verifiedHTTP &&
+		len(fingerprint.TLSInspectResults) == 0 && !fingerprint.CheckedTLS {
 		f.log("start TLS inspection for %v", utils2.HostPort(host, port))
-		matchResult.Fingerprint.TLSInspectResults, _ = netx.TLSInspectTimeout(utils2.HostPort(host, port), 5)
+		tlsCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		matchResult.Fingerprint.TLSInspectResults, _ = netx.TLSInspectContext(tlsCtx, utils2.HostPort(host, port))
+		cancel()
 		f.log("TLS inspection completed")
 	}
 
 	f.log("tidying match result")
 	matchResult.Tidy()
-	if matchResult.State == OPEN {
+	if matchResult.State == OPEN && ctx.Err() == nil {
 		if config.EnableCache {
 			f.log("saving result to memory cache")
 			SetMatchResultCache(cacheKey, matchResult)

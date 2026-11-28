@@ -171,7 +171,19 @@ func (s *Scannerx) probeTCP(ctx context.Context, target *SynxTarget) (netstackvm
 	// after a rate token, so queue time is not part of that budget.
 	probeCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	return s.halfOpen.Probe(netstackvm.ContextWithProbeBudget(probeCtx, timeout), net.JoinHostPort(target.Host, strconv.Itoa(target.Port)))
+	probeCtx = netstackvm.ContextWithProbeBudget(probeCtx, timeout)
+	var started time.Time
+	var stages *netstackvm.TCPProbeTiming
+	if s.timing != nil {
+		started = time.Now()
+		stages = new(netstackvm.TCPProbeTiming)
+		probeCtx = netstackvm.ContextWithTCPProbeTiming(probeCtx, stages)
+	}
+	reply, err := s.halfOpen.Probe(probeCtx, net.JoinHostPort(target.Host, strconv.Itoa(target.Port)))
+	if s.timing != nil {
+		s.timing.recordTCPProbe(started, *stages, err)
+	}
+	return reply, err
 }
 
 func quietProbeErr(err error) bool {
@@ -257,6 +269,9 @@ func (s *Scannerx) probeUDP(ctx context.Context, target *SynxTarget) (netstackvm
 		// queue time is not counted as response time.
 		probeCtx, cancel := context.WithTimeout(ctx, timeout)
 		last, err = s.halfOpen.ProbeUDP(netstackvm.ContextWithProbeBudget(probeCtx, timeout), targetText, payload)
+		if s.timing != nil {
+			s.timing.lastProbeEnd.Record(time.Now())
+		}
 		cancel()
 		if !errors.Is(err, netstackvm.ErrUDPNoResponse) {
 			return last, err

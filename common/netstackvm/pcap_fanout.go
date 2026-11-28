@@ -12,7 +12,9 @@ import (
 	"github.com/gopacket/gopacket/layers"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/pcap"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 )
 
 // One capture reader serves every subscriber of a device/configuration. Holding
@@ -31,15 +33,16 @@ type packetCaptureHandle interface {
 }
 
 type pcapFanOut struct {
-	m           sync.Mutex
-	writeGate   chan struct{}
-	handle      packetCaptureHandle
-	inject      func([]byte) error
-	closeInject func()
-	device      string
-	chans       map[string]chan gopacket.Packet
-	stop        chan struct{}
-	done        chan struct{}
+	m             sync.Mutex
+	writeGate     chan struct{}
+	handle        packetCaptureHandle
+	inject        func([]byte) error
+	closeInject   func()
+	device        string
+	chans         map[string]chan gopacket.Packet
+	stop          chan struct{}
+	done          chan struct{}
+	deliveryDrops uint64
 }
 
 func NewPCAPAdaptor(device string, mtu int32, promisc bool) (*pcapAdaptor, error) {
@@ -77,10 +80,9 @@ func NewPCAPAdaptor(device string, mtu int32, promisc bool) (*pcapAdaptor, error
 		p.m.Unlock()
 		if last {
 			delete(fanouts.entries, key)
-			close(p.stop)
-			// ReadPacketData is bounded by the capture timeout; no orphan packet-source goroutine.
-			<-p.done
+			p.stopReader()
 			p.writeGate <- struct{}{}
+			p.logCaptureStats()
 			p.closeInject()
 			p.handle.Close()
 			p.handle = nil
@@ -90,6 +92,28 @@ func NewPCAPAdaptor(device string, mtu int32, promisc bool) (*pcapAdaptor, error
 	broker.contextWriter = p.WritePacketContext
 	broker.linkType = p.handle.LinkType()
 	return broker, nil
+}
+
+// logCaptureStats runs after the reader has stopped, while its handle is still open.
+func (p *pcapFanOut) logCaptureStats() {
+	if !diagnostics.Enabled(diagnostics.LevelNormal) {
+		return
+	}
+	received, kernelDrops := -1, -1
+	if capture, ok := p.handle.(interface{ Stats() (*pcap.Stats, error) }); ok {
+		if stats, err := capture.Stats(); err == nil && stats != nil {
+			received, kernelDrops = stats.PacketsReceived, stats.PacketsDropped
+		}
+	}
+	log.Infof("netstackvm capture stats: device=%q received=%d kernel_dropped=%d fanout_dropped=%d", p.device, received, kernelDrops, p.deliveryDrops)
+}
+
+func (p *pcapFanOut) stopReader() {
+	close(p.stop)
+	if capture, ok := p.handle.(interface{ interruptRead() }); ok {
+		capture.interruptRead()
+	}
+	<-p.done
 }
 
 func (p *pcapFanOut) WritePacket(data []byte) error {
@@ -166,6 +190,7 @@ func (p *pcapFanOut) dispatch(data []byte, ci gopacket.CaptureInfo, decoder gopa
 		select {
 		case ch <- packet:
 		default:
+			p.deliveryDrops++
 		}
 	}
 }

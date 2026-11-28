@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -181,13 +182,15 @@ func deduplicateResults(results []*TLSInspectResult) []*TLSInspectResult {
 // inspectDialTCP is the TCP dial used by TLS inspection. Tests replace it to
 // count attempts. A dial failure is not a TLS problem and must not trigger
 // another handshake.
-var inspectDialTCP = DialTCPTimeout
+var inspectDialTCP = func(ctx context.Context, timeout time.Duration, target string) (net.Conn, error) {
+	return DialX(target, DialX_WithTimeout(timeout), DialX_WithContext(ctx))
+}
 
 // tlsInspectWithGMTLS tries to inspect TLS certificates using gmtls with optional GMSupport.
 // dialErr is set only when the TCP dial itself fails. A handshake error leaves dialErr nil
 // so the caller can try another TLS mode.
-func tlsInspectWithGMTLS(ctx context.Context, addr string, host string, port int, dialTimeout time.Duration, gmOnly bool, proto ...string) ([]*TLSInspectResult, error) {
-	conn, err := inspectDialTCP(dialTimeout, utils.HostPort(host, port))
+func tlsInspectWithGMTLS(ctx context.Context, target, host string, dialTimeout time.Duration, gmOnly bool, proto ...string) ([]*TLSInspectResult, error) {
+	conn, err := inspectDialTCP(ctx, dialTimeout, target)
 	if err != nil {
 		log.Debugf("TLSInspect(gmtls, gmOnly=%v): dial error: %s", gmOnly, err)
 		return nil, err
@@ -235,6 +238,12 @@ func tlsInspectWithGMTLS(ctx context.Context, addr string, host string, port int
 }
 
 func TLSInspectContext(ctx context.Context, addr string, proto ...string) ([]*TLSInspectResult, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	host, port, _ := utils.ParseStringToHostPort(addr)
 	if port <= 0 {
 		port = 443
@@ -243,9 +252,7 @@ func TLSInspectContext(ctx context.Context, addr string, proto ...string) ([]*TL
 		host = addr
 	}
 
-	if ctx == nil {
-		ctx = context.Background()
-	}
+	target := utils.HostPort(host, port)
 
 	// calculate dial timeout based on context deadline
 	dialTimeout := 5 * time.Second
@@ -267,16 +274,18 @@ func TLSInspectContext(ctx context.Context, addr string, proto ...string) ([]*TL
 	// GMTLS first. A failed dial means the port is closed or filtered, so the
 	// standard-TLS handshake is not attempted. A handshake error is a TLS
 	// problem and still falls through to the other mode.
-	gmResults, dialErr := tlsInspectWithGMTLS(ctx, addr, host, port, dialTimeout, true, proto...)
+	gmResults, dialErr := tlsInspectWithGMTLS(ctx, target, host, dialTimeout, true, proto...)
 	if dialErr != nil {
 		log.Debugf("TLSInspect: dial %s failed, skip further tls handshakes: %s", addr, dialErr)
 		return nil, dialErr
 	}
 	allResults = append(allResults, gmResults...)
 
-	// try standard TLS mode (using gmtls library without GMSupport, which supports standard TLS)
-	stdResults, _ := tlsInspectWithGMTLS(ctx, addr, host, port, dialTimeout, false, proto...)
-	allResults = append(allResults, stdResults...)
+	if ctx.Err() == nil {
+		// The gmtls library supports standard TLS without GMSupport.
+		stdResults, _ := tlsInspectWithGMTLS(ctx, target, host, dialTimeout, false, proto...)
+		allResults = append(allResults, stdResults...)
+	}
 
 	// deduplicate results based on certificate Raw bytes
 	deduplicated := deduplicateResults(allResults)
@@ -286,7 +295,8 @@ func TLSInspectContext(ctx context.Context, addr string, proto ...string) ([]*TL
 		return deduplicated, nil
 	}
 
-	// if no results, return empty slice with no error (handshake might have failed but we still tried)
+	// A successful TCP dial establishes reachability even when the handshake
+	// budget ends. Callers can use their own budget to continue with HTTP.
 	return []*TLSInspectResult{}, nil
 }
 

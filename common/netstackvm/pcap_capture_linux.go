@@ -36,6 +36,7 @@ func captureWithChecksumMetadata(device string, snaplen int, promisc bool, fallb
 
 type linuxPacketCapture struct {
 	fd       int
+	wakeFD   int
 	iface    int
 	loopback bool
 	data     []byte
@@ -73,11 +74,44 @@ func newLinuxPacketCapture(iface *net.Interface, snaplen int, promisc bool) (_ *
 	if err = unix.Bind(fd, &unix.SockaddrLinklayer{Ifindex: iface.Index, Protocol: protocol}); err != nil {
 		return nil, err
 	}
-	return &linuxPacketCapture{fd: fd, iface: iface.Index, loopback: iface.Flags&net.FlagLoopback != 0, data: make([]byte, snaplen), oob: make([]byte, 128)}, nil
+	wakeFD, wakeErr := unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC)
+	if wakeErr != nil {
+		// Poll's existing timeout keeps shutdown bounded if eventfd is unavailable.
+		wakeFD = -1
+	}
+	return &linuxPacketCapture{fd: fd, wakeFD: wakeFD, iface: iface.Index, loopback: iface.Flags&net.FlagLoopback != 0, data: make([]byte, snaplen), oob: make([]byte, 128)}, nil
 }
 
 func (h *linuxPacketCapture) LinkType() layers.LinkType { return layers.LinkTypeEthernet }
-func (h *linuxPacketCapture) Close()                    { _ = unix.Close(h.fd) }
+
+func (h *linuxPacketCapture) Stats() (*pcap.Stats, error) {
+	stats, err := unix.GetsockoptTpacketStats(h.fd, unix.SOL_PACKET, unix.PACKET_STATISTICS)
+	if err != nil {
+		return nil, err
+	}
+	return &pcap.Stats{PacketsReceived: int(stats.Packets), PacketsDropped: int(stats.Drops)}, nil
+}
+
+func (h *linuxPacketCapture) Close() {
+	_ = unix.Close(h.fd)
+	if h.wakeFD >= 0 {
+		_ = unix.Close(h.wakeFD)
+	}
+}
+
+func (h *linuxPacketCapture) interruptRead() {
+	if h.wakeFD < 0 {
+		return
+	}
+	var signal [8]byte
+	binary.NativeEndian.PutUint64(signal[:], 1)
+	for {
+		if _, err := unix.Write(h.wakeFD, signal[:]); err != unix.EINTR {
+			return
+		}
+	}
+}
+
 func (h *linuxPacketCapture) WritePacketData(data []byte) error {
 	n, err := unix.Write(h.fd, data)
 	if err == nil && n != len(data) {
@@ -86,17 +120,21 @@ func (h *linuxPacketCapture) WritePacketData(data []byte) error {
 	return err
 }
 
-// The fanout owns the sole reader and waits for it before closing the descriptor.
-// Poll is bounded so an idle link, discarded packet or interrupted syscall
-// always returns control to the fanout's cancellation check.
+// The fanout signals wakeFD and joins the reader before closing either descriptor.
 func (h *linuxPacketCapture) ReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
-	fds := []unix.PollFd{{Fd: int32(h.fd), Events: unix.POLLIN}}
+	fds := []unix.PollFd{
+		{Fd: int32(h.fd), Events: unix.POLLIN},
+		{Fd: int32(h.wakeFD), Events: unix.POLLIN},
+	}
 	n, err := unix.Poll(fds, 100)
 	if n == 0 || err == unix.EINTR {
 		return nil, gopacket.CaptureInfo{}, pcap.NextErrorTimeoutExpired
 	}
 	if err != nil {
 		return nil, gopacket.CaptureInfo{}, err
+	}
+	if fds[1].Revents&unix.POLLIN != 0 {
+		return nil, gopacket.CaptureInfo{}, io.EOF
 	}
 	if fds[0].Revents&(unix.POLLERR|unix.POLLHUP|unix.POLLNVAL) != 0 {
 		return nil, gopacket.CaptureInfo{}, fmt.Errorf("packet capture descriptor unavailable: poll events %#x", fds[0].Revents)

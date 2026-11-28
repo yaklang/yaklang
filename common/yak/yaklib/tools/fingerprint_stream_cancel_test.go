@@ -11,10 +11,14 @@ import (
 )
 
 func TestFingerprintTargetStreamCancelWhileInputIdle(t *testing.T) {
-	for _, kind := range []string{"syn", "space-engine"} {
-		t.Run(kind, func(t *testing.T) {
+	for _, name := range []string{"ScanFromSynResult", "ScanFromSpaceEngine"} {
+		t.Run(name, func(t *testing.T) {
+			scan, ok := FingerprintScanExports[name].(func(interface{}, ...fp.ConfigOption) (chan *fp.MatchResult, error))
+			if !ok {
+				t.Fatalf("%s changed its exported signature", name)
+			}
 			var input interface{}
-			if kind == "syn" {
+			if name == "ScanFromSynResult" {
 				ch := make(chan *synscan.SynScanResult)
 				input = ch
 				defer close(ch)
@@ -25,7 +29,7 @@ func TestFingerprintTargetStreamCancelWhileInputIdle(t *testing.T) {
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			out, err := _scanFromTargetStream(input, fp.WithCtx(ctx), fp.WithPoolSize(1))
+			out, err := scan(input, fp.WithCtx(ctx), fp.WithPoolSize(1))
 			if err != nil {
 				t.Fatal(err)
 			}

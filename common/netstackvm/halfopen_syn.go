@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
@@ -402,12 +403,42 @@ func (h *HalfOpenSYN) StartTCPProbe(ctx context.Context, target string, options 
 	return p, nil
 }
 
+// TCPProbeTiming records the synchronous probe's admission and send time, then its time to finish.
+// Read the timings after the probe returns.
+type TCPProbeTiming struct {
+	AdmissionAndSend time.Duration
+	AfterFirstSend   time.Duration
+}
+
+type tcpProbeTimingKey struct{}
+
+// ContextWithTCPProbeTiming attaches an optional timing destination to one probe.
+func ContextWithTCPProbeTiming(ctx context.Context, timing *TCPProbeTiming) context.Context {
+	return context.WithValue(ctx, tcpProbeTimingKey{}, timing)
+}
+
 // ProbeSYN synchronously probes one target without completing the handshake.
 // It owns and closes the probe on every return path, including cancellation.
 // The context bounds admission, sending, retries and response waiting. Callers
 // own batch concurrency and give each call its own context. Use StartTCPProbe
 // instead when individual steps or a longer-lived probe are needed.
 func (h *HalfOpenSYN) ProbeSYN(ctx context.Context, target string, options ...TCPProbeOption) (TCPSegment, error) {
+	var timing *TCPProbeTiming
+	if ctx != nil {
+		timing, _ = ctx.Value(tcpProbeTimingKey{}).(*TCPProbeTiming)
+	}
+	var sentAt time.Time
+	if timing != nil {
+		started := time.Now()
+		defer func() {
+			finished := time.Now()
+			if sentAt.IsZero() {
+				sentAt = finished
+			}
+			timing.AdmissionAndSend = sentAt.Sub(started)
+			timing.AfterFirstSend = finished.Sub(sentAt)
+		}()
+	}
 	// A response budget must not expire while this probe waits for a rate token.
 	// Cancellation still aborts the probe. Callers that set only a deadline keep
 	// the previous behavior.
@@ -425,6 +456,9 @@ func (h *HalfOpenSYN) ProbeSYN(ctx context.Context, target string, options ...TC
 	defer probe.Close()
 	if _, err = probe.ProbeSYNContext(runCtx); err != nil {
 		return TCPSegment{}, err
+	}
+	if timing != nil {
+		sentAt = time.Now()
 	}
 	// Retries share one response window that starts after the SYN is sent.
 	// Time spent waiting for the first rate token is not part of it.

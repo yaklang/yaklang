@@ -3,13 +3,15 @@ package fp
 import (
 	"context"
 	"fmt"
+	"net"
+	"slices"
+	"sync"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	utils2 "github.com/yaklang/yaklang/common/utils"
-	"net"
-	"sync"
-	"time"
 )
 
 func tcpConnectionMaker(host string, port interface{}, proxy []string, timeout time.Duration) (net.Conn, error) {
@@ -31,7 +33,7 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 		if result.State == OPEN {
 			f.reportOpen(result)
 		}
-		return specialCase(result, config), nil
+		return specialCase(ctx, result, config), nil
 	}
 
 	// 获取需要匹配的指纹. 缓存按端口和传输协议复用, 追加前先复制, 避免改到缓存切片.
@@ -40,6 +42,7 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 		return nil, errors.New("empty rules is not allowed")
 	}
 	_ = bestMode
+	var earlyHTTP *inventoryHTTPProbe
 	if firstBlock != nil {
 		if config.CanScanUDP() {
 			copied := make([]*RuleBlock, len(blocks), len(blocks)+1)
@@ -48,7 +51,31 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 		} else if config.CanScanTCP() {
 			log.Debugf("%s - %v ", firstBlock.Probe.Name, firstBlock.Probe.Proto)
 
-			state, info, err := f.matchBlock(ctx, ip, port, firstBlock, config)
+			httpIndex := plannedInventoryHTTPProbe(config, blocks)
+			if httpIndex >= 0 {
+				earlyHTTP = &inventoryHTTPProbe{block: blocks[httpIndex]}
+				defer earlyHTTP.stop()
+			}
+			state, info, err := f.matchTCPBanner(ctx, ip, port, firstBlock, config, earlyHTTP)
+			bannerPresent := info != nil && info.Banner != ""
+			if state == OPEN && !bannerPresent && earlyHTTP != nil && earlyHTTP.done != nil {
+				select {
+				case <-earlyHTTP.done:
+					if earlyHTTP.outcome == nil {
+						earlyHTTP = nil
+					} else if earlyHTTP.outcome.verifiedHTTP() {
+						info = earlyHTTP.outcome.info
+						f.log("verified HTTP response completed banner detection for %s", utils2.HostPort(host, port))
+					}
+				default:
+				}
+				// Reserve the running HTTP probe's slot in the existing concurrency limit.
+				if earlyHTTP != nil && httpIndex > 0 {
+					blocks = slices.Clone(blocks)
+					copy(blocks[1:httpIndex+1], blocks[:httpIndex])
+					blocks[0] = earlyHTTP.block
+				}
+			}
 			result.State = state
 			result.Fingerprint = info
 			if info != nil {
@@ -57,7 +84,7 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 			if err != nil {
 				result.Reason = err.Error()
 			}
-			if (result.Fingerprint != nil && result.Fingerprint.Banner != "") || result.State == CLOSED {
+			if bannerPresent || result.State == CLOSED {
 				return deliver()
 			}
 		}
@@ -83,14 +110,10 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 			continue
 		}
 
-		select {
-		case <-ctx.Done():
-			return deliver()
-		default:
+		if err := probeSwg.AddWithContext(ctx); err != nil {
+			break
 		}
 
-		// 处理结果
-		probeSwg.Add()
 		go func() {
 			defer probeSwg.Done()
 			defer func() {
@@ -106,14 +129,22 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 				}
 			}
 			log.Debugf("try %s probe[%v] rarity[%v] %#v", utils2.HostPort(host, port), block.Probe.Index, block.Probe.Rarity, block.Probe.Payload)
-			state, info, err := f.matchBlock(ctx, ip, port, block, config)
+			var outcome *serviceProbeOutcome
+			if earlyHTTP != nil && block == earlyHTTP.block && earlyHTTP.done != nil {
+				<-earlyHTTP.done
+				outcome = earlyHTTP.outcome
+			}
+			if outcome == nil {
+				state, info, err := f.matchBlock(ctx, ip, port, block, config, nil)
+				outcome = &serviceProbeOutcome{state: state, info: info, err: err}
+			}
 			collectResultLock.Lock()
 			defer collectResultLock.Unlock()
-			states = append(states, state)
-			infos = append(infos, info)
-			if err != nil {
-				log.Errorf("fingerprint match met err: %s", err)
-				errs = append(errs, err)
+			states = append(states, outcome.state)
+			infos = append(infos, outcome.info)
+			if outcome.err != nil {
+				log.Errorf("fingerprint match met err: %s", outcome.err)
+				errs = append(errs, outcome.err)
 			}
 		}()
 	}
@@ -125,17 +156,103 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 	}
 
 	if result.State != OPEN {
-		result.State = mergeStates(states...)
+		state := mergeStates(states...)
+		if state == OPEN || ctx.Err() == nil {
+			result.State = state
+		}
 	}
-	result.Fingerprint = mergeInfo(infos...)
+	if fingerprint := mergeInfo(infos...); fingerprint != nil || ctx.Err() == nil {
+		result.Fingerprint = fingerprint
+	}
 	if result.State != OPEN && len(errs) > 0 {
 		result.Reason = mergeError(errs...).Error()
 	}
 
-	if result.State == OPEN {
-		f.reportOpen(result)
+	return deliver()
+}
+
+const inventoryBannerGrace = 150 * time.Millisecond
+
+type serviceProbeOutcome struct {
+	state PortState
+	info  *FingerprintInfo
+	err   error
+}
+
+func (r *serviceProbeOutcome) verifiedHTTP() bool {
+	return r != nil && r.err == nil && r.state == OPEN && r.info != nil &&
+		r.info.confirmedPlainHTTP && r.info.ServiceName == "http"
+}
+
+type inventoryHTTPProbe struct {
+	block   *RuleBlock
+	done    chan struct{}
+	cancel  context.CancelFunc
+	outcome *serviceProbeOutcome
+}
+
+func plannedInventoryHTTPProbe(config *Config, blocks []*RuleBlock) int {
+	if !config.PreferVerifiedHTTP || !config.ActiveMode || len(config.Proxies) != 0 {
+		return -1
 	}
-	return specialCase(result, config), nil
+	for i, block := range blocks {
+		if block == nil || block.Probe == nil {
+			continue
+		}
+		probe := block.Probe
+		if probe.Proto == TCP && probe.Name == "GetRequest" && probe.Payload == "GET / HTTP/1.0\r\n\r\n" {
+			return i
+		}
+	}
+	return -1
+}
+
+func (f *Matcher) matchTCPBanner(ctx context.Context, ip net.IP, port int, block *RuleBlock, config *Config, httpProbe *inventoryHTTPProbe) (PortState, *FingerprintInfo, error) {
+	if httpProbe == nil {
+		return f.matchBlock(ctx, ip, port, block, config, nil)
+	}
+	bannerCtx, cancelBanner := context.WithCancel(ctx)
+	defer cancelBanner()
+	bannerDone := make(chan struct{})
+	defer close(bannerDone)
+	return f.matchBlock(bannerCtx, ip, port, block, config, func(conn *protocolResponseConn) {
+		httpCtx, cancelHTTP := context.WithCancel(ctx)
+		httpProbe.cancel = cancelHTTP
+		httpProbe.done = make(chan struct{})
+		go func() {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					log.Errorf("inventory HTTP probe failed: %v", recovered)
+				}
+				verified := httpProbe.outcome.verifiedHTTP()
+				close(httpProbe.done)
+				if verified {
+					cancelBanner()
+				}
+			}()
+			grace := time.NewTimer(inventoryBannerGrace)
+			defer grace.Stop()
+			select {
+			case <-bannerDone:
+				return
+			case <-httpCtx.Done():
+				return
+			case <-grace.C:
+			}
+			if conn.readBytes.Load() > 0 || httpCtx.Err() != nil {
+				return
+			}
+			state, info, err := f.matchBlock(httpCtx, ip, port, httpProbe.block, config, nil)
+			httpProbe.outcome = &serviceProbeOutcome{state: state, info: info, err: err}
+		}()
+	})
+}
+
+func (p *inventoryHTTPProbe) stop() {
+	if p.done != nil {
+		p.cancel()
+		<-p.done
+	}
 }
 
 func mergeStates(states ...PortState) PortState {
@@ -174,11 +291,13 @@ func mergeInfo(rawInfos ...*FingerprintInfo) *FingerprintInfo {
 		if infoIns.Port != root.Port {
 			continue
 		}
+		confirmedPlainHTTP := root.confirmedPlainHTTP || infoIns.confirmedPlainHTTP
 		// 当有 Raw 字段时，代表和 match rule 匹配成功了
 		if len(root.Raw) == 0 && len(infoIns.Raw) != 0 {
 			root = infoIns
 		}
 
+		root.confirmedPlainHTTP = confirmedPlainHTTP
 		root.HttpFlows = append(root.HttpFlows, infoIns.HttpFlows...)
 		root.CPEs = append(root.CPEs, infoIns.CPEs...)
 	}

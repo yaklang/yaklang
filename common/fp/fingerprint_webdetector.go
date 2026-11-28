@@ -1,9 +1,12 @@
 package fp
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,9 +40,19 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 	if h == "" {
 		h = ip.String()
 	}
-	var inspectResults []*netx.TLSInspectResult
-	var tlsChecked bool
-	_, tlsChecked, inspectResults, redirectInfos, err := f.fetchBannerFromHostPort(ctx, nil, nil, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
+	verifiedHTTP := config.PreferVerifiedHTTP && result.Fingerprint != nil && result.Fingerprint.confirmedPlainHTTP && result.GetServiceName() == "http"
+	_, tlsChecked, inspectResults, redirectInfos, err := f.fetchBannerFromHostPortWithTLSSkipped(verifiedHTTP, ctx, nil, nil, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
+	if verifiedHTTP {
+		// Confirm that the Web request also succeeds over plaintext for this host and port.
+		if err == nil && len(redirectInfos) == 1 && !redirectInfos[0].IsHttps && isSuccessfulHTTPResponse(redirectInfos[0].Response) {
+			f.log("using verified plaintext HTTP for asset inventory: %v", utils2.HostPort(h, port))
+			tlsChecked = false
+		} else {
+			verifiedHTTP = false
+			result.Fingerprint.confirmedPlainHTTP = false
+			_, tlsChecked, inspectResults, redirectInfos, err = f.fetchBannerFromHostPortWithTLSSkipped(false, ctx, nil, nil, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
+		}
+	}
 	if err != nil {
 		// TCP reachability alone is not a successful web probe. Preserve the
 		// incoming state and fingerprints so only_web keeps its classification
@@ -162,7 +175,7 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 			target := utils2.HostPort(host, port)
 			packet := buildWebPathRequestPacket(webPath, target)
 			f.log("sending request to path: %s", webPath)
-			ok, _, _, flow, err := f.fetchBannerFromHostPortWithTLSSkipped(tlsChecked, ctx, packet, inspectResults, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
+			ok, _, _, flow, err := f.fetchBannerFromHostPortWithTLSSkipped(tlsChecked || verifiedHTTP, ctx, packet, inspectResults, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
 			if err != nil {
 				return nil, err
 			}
@@ -275,11 +288,11 @@ func (f *Matcher) fetchBannerFromHostPortWithTLSSkipped(checkedTls bool, baseCtx
 	portInt, _ := strconv.Atoi(fmt.Sprint(port))
 	target := utils2.HostPort(host, port)
 
-	f.log("checking if target is TLS service: %v", target)
 	start := time.Now()
 
 	var isTls bool = len(tlsInspectResults) > 0
 	if !isTls && !checkedTls {
+		f.log("checking if target is TLS service: %v", target)
 		var inspectErr error
 		tlsCtx, cancel := context.WithTimeout(baseCtx, f.Config.ProbeTimeout)
 		tlsInspectResults, inspectErr = netx.TLSInspectContext(tlsCtx, target)
@@ -344,14 +357,12 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 	return isOpen, tlsChecked, tlsInspectResults, rspDetail.RedirectRawPackets, nil
 }
 
-func (f *Matcher) fetchBannerFromHostPort(baseCtx context.Context, packet2 []byte, tlsInspectResults []*netx.TLSInspectResult, host string, port interface{}, bufferSize int64, runtimeId string, proxy ...string) (
-	isPortOpen bool,
-	tlsChecked bool,
-	tlsResults []*netx.TLSInspectResult,
-	flows []*lowhttp.RedirectFlow,
-	_ error,
-) {
-	return f.fetchBannerFromHostPortWithTLSSkipped(false, baseCtx, packet2, tlsInspectResults, host, port, bufferSize, runtimeId, proxy...)
+func isSuccessfulHTTPResponse(packet []byte) bool {
+	if !bytes.HasPrefix(packet, []byte("HTTP/1.")) {
+		return false
+	}
+	response, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(packet)), nil)
+	return err == nil && response.StatusCode >= http.StatusOK && response.StatusCode < http.StatusMultipleChoices
 }
 
 func buildWebPathRequestPacket(webPath, target string) []byte {

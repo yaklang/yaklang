@@ -332,6 +332,26 @@ func TestOutputFileTruncatesOnOpen(t *testing.T) {
 	}
 }
 
+func TestFailedSYNStartupPreservesOutputFile(t *testing.T) {
+	s := newPlanScanner(t)
+	s.config.Iface = nil
+	s.config.outputFile = filepath.Join(t.TempDir(), "ports.txt")
+	const previous = "previous result\n"
+	if err := os.WriteFile(s.config.outputFile, []byte(previous), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Scan(nil); err == nil || !strings.Contains(err.Error(), "interface is not selected") {
+		t.Fatalf("Scan() error = %v, want interface selection failure", err)
+	}
+	data, err := os.ReadFile(s.config.outputFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != previous {
+		t.Fatalf("failed startup changed previous results to %q", data)
+	}
+}
+
 func TestHostFilterResolvesHyphenatedDomain(t *testing.T) {
 	if !looksLikeIPv4Range("10.0.0.1-10.0.0.20") || !looksLikeIPv4Range("1.1.1.1-3") {
 		t.Fatal("ip range was not recognized")
