@@ -16,6 +16,9 @@ import (
 // write the register, which is the standard construction.
 func (c *converter) planMergePhis(function core.Function) {
 	c.mergePhis = make(map[core.BlockID]map[string]*ssa.Phi)
+	if len(function.Blocks) == 0 {
+		return
+	}
 	if c.blockOut == nil {
 		// Keep what bindParameters recorded: an entry value is the edge value a
 		// first block supplies.

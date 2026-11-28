@@ -27,10 +27,14 @@ func TestDuplicateReturnBlocksCopiesSharedEpilogue(t *testing.T) {
 		core.Block{ID: 2, Address: 0x1001, Instructions: []core.Instruction{jumpTo(4, 0x1001)}},
 		core.Block{ID: 3, Address: 0x1002, Instructions: []core.Instruction{jumpTo(4, 0x1002)}},
 		returnBlock(4, 0x1003),
+		core.Block{ID: 5, Address: 0x1004},
 	)
 	DuplicateReturnBlocks(&function)
-	if len(function.Blocks) != 3 {
+	if len(function.Blocks) != 4 {
 		t.Fatalf("shared epilogue survived: %d blocks", len(function.Blocks))
+	}
+	if block := function.Blocks[3]; block.ID != 5 || len(block.Instructions) != 0 {
+		t.Fatalf("empty block was changed: %+v", block)
 	}
 	for _, block := range function.Blocks {
 		if block.ID == 4 {

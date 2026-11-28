@@ -442,85 +442,47 @@ func uniqueAddresses(addresses []uint64) []uint64 {
 	return result
 }
 
-func peFindRVASection(file *pe.File, rva uint32) (*pe.Section, uint64, uint64, error) {
+func peRVARange(reader *core.ByteReader, file *pe.File, rva uint32, size uint64) (uint64, uint64, error) {
+	if reader == nil {
+		return 0, 0, fmt.Errorf("PE RVA 0x%x has no backing reader", rva)
+	}
 	for _, section := range file.Sections {
-		if rva < section.VirtualAddress || rva-section.VirtualAddress >= section.VirtualSize {
+		if rva < section.VirtualAddress || rva-section.VirtualAddress >= max(section.VirtualSize, section.Size) {
 			continue
 		}
-		delta := uint64(rva - section.VirtualAddress)
-		if delta >= uint64(section.Size) {
-			return nil, 0, 0, fmt.Errorf("PE RVA 0x%x has no file data", rva)
+		delta := rva - section.VirtualAddress
+		if section.Offset == 0 || delta >= section.Size || size == 0 {
+			return 0, 0, fmt.Errorf("PE RVA 0x%x has no file data", rva)
 		}
-		avail := uint64(section.Size) - delta
-		return section, delta, avail, nil
+		fileOffset := uint64(section.Offset) + uint64(delta)
+		if reader.Size() <= 0 || fileOffset >= uint64(reader.Size()) {
+			return 0, 0, fmt.Errorf("PE RVA 0x%x exceeds file size", rva)
+		}
+		avail := min(size, uint64(section.Size-delta), uint64(reader.Size())-fileOffset)
+		return fileOffset, avail, nil
 	}
-	return nil, 0, 0, fmt.Errorf("PE RVA 0x%x is not in a section", rva)
+	return 0, 0, fmt.Errorf("PE RVA 0x%x is not in a section", rva)
 }
 
 func peReadRVA(reader *core.ByteReader, file *pe.File, rva, size uint32) ([]byte, error) {
-	section, delta, avail, err := peFindRVASection(file, rva)
+	offset, length, err := peRVARange(reader, file, rva, uint64(size))
 	if err != nil {
 		return nil, err
 	}
-	readSize := uint64(size)
-	if readSize > avail {
-		readSize = avail
-	}
-	if readSize == 0 {
-		return nil, fmt.Errorf("PE RVA 0x%x has no file data", rva)
-	}
-	if reader != nil {
-		return reader.Bytes(uint64(section.Offset)+delta, readSize)
-	}
-	data, err := section.Data()
-	if err != nil {
-		return nil, err
-	}
-	if delta >= uint64(len(data)) {
-		return nil, fmt.Errorf("PE RVA 0x%x has no file data", rva)
-	}
-	if delta+readSize > uint64(len(data)) {
-		readSize = uint64(len(data)) - delta
-	}
-	return data[delta : delta+readSize], nil
+	return reader.Bytes(offset, length)
 }
 
 func peReadRVABuf(reader *core.ByteReader, file *pe.File, rva uint32, dst []byte) (int, error) {
-	section, delta, avail, err := peFindRVASection(file, rva)
+	offset, length, err := peRVARange(reader, file, rva, uint64(len(dst)))
 	if err != nil {
 		return 0, err
 	}
-	readSize := uint64(len(dst))
-	if readSize > avail {
-		readSize = avail
-	}
-	if readSize == 0 {
-		return 0, fmt.Errorf("PE RVA 0x%x has no file data", rva)
-	}
-	if reader != nil {
-		n, err := reader.ReadAt(dst[:int(readSize)], int64(uint64(section.Offset)+delta))
-		if n > 0 {
-			return n, nil
-		}
-		return 0, err
-	}
-	data, err := section.Data()
-	if err != nil {
-		return 0, err
-	}
-	if delta >= uint64(len(data)) {
-		return 0, fmt.Errorf("PE RVA 0x%x has no file data", rva)
-	}
-	n := copy(dst, data[delta:])
-	return n, nil
+	return reader.ReadAt(dst[:int(length)], int64(offset))
 }
 
 func peReadCString(reader *core.ByteReader, file *pe.File, rva uint32, scratch []byte) (string, error) {
-	if len(scratch) == 0 {
-		scratch = make([]byte, 512)
-	}
 	n, err := peReadRVABuf(reader, file, rva, scratch)
-	if err != nil || n == 0 {
+	if err != nil {
 		return "", err
 	}
 	data := scratch[:n]

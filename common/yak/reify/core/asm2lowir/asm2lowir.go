@@ -296,9 +296,11 @@ func discover(artifact *core.Artifact, config Config) ([]core.FunctionBoundary, 
 		hints = *artifact.Hints
 	}
 	if config.Function != "" {
+		explicitSize := uint64(0)
 		if artifact.Image != nil {
 			if entry, ok := artifact.Image.SymbolByName(config.Function); ok {
 				config.Function = entry.Name
+				explicitSize = entry.Size
 			}
 		}
 		// On ARM, Thumb symbols can carry the low bit set, so parser discovery
@@ -330,7 +332,7 @@ func discover(artifact *core.Artifact, config Config) ([]core.FunctionBoundary, 
 				if existing.Mode != "" {
 					boundary.Mode = existing.Mode
 				}
-				if boundary.Size == 0 && existing.Size > 0 {
+				if existing.Size > 0 && (boundary.Size == 0 || explicitSize == 0) {
 					boundary.Size = existing.Size
 				}
 				return []core.FunctionBoundary{boundary}, stats, nil

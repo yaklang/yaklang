@@ -306,8 +306,11 @@ type converter struct {
 }
 
 func (c *converter) convertFunction(function core.Function) error {
-	c.sourceFunction = function
 	name := functionName(function)
+	if len(function.Blocks) == 0 {
+		return fmt.Errorf("lowir2ssa: function %s at 0x%x has no basic blocks", name, function.Address)
+	}
+	c.sourceFunction = function
 	ssaFunction := c.program.NewFunction(name)
 	metadata := ""
 	if function.Boundary != "" {
@@ -616,6 +619,9 @@ func (c *converter) convertInstruction(instruction core.Instruction) {
 	case core.OpConstant:
 		c.setResult(instruction, c.constValue(firstOperand(instruction.Operands)))
 	case core.OpCopy:
+		if len(instruction.Results) == 0 {
+			return
+		}
 		value := c.operandValue(firstOperand(instruction.Operands))
 		if value == nil {
 			c.setResult(instruction, c.opaqueValue("copy", instruction))

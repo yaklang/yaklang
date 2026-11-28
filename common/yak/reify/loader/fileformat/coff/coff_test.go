@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -174,6 +175,14 @@ func TestLoadLongSymbolName(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsIncompleteSymbolRecord(t *testing.T) {
+	data := object()
+	_, err := Loader{}.Load(context.Background(), readerFor(t, data[:len(data)-1]))
+	if err == nil || !strings.Contains(err.Error(), "coff: invalid symbol table") {
+		t.Fatalf("expected a symbol table error, got %v", err)
+	}
+}
+
 // TestLoadLaysSectionsOut checks that sections sharing the default address zero
 // get distinct bases. A relocatable object has no assigned addresses, so without
 // the layout every section would overlap.
@@ -211,4 +220,25 @@ func TestLoadLaysSectionsOut(t *testing.T) {
 	if other < first+artifact.Image.Sections[0].MemorySize {
 		t.Fatalf("sections overlap: %#x and %#x", first, other)
 	}
+}
+
+func TestLoadRejectsMalformedSymbolTableHeaders(t *testing.T) {
+	t.Run("huge_symbol_count", func(t *testing.T) {
+		raw := object()
+		binary.LittleEndian.PutUint32(raw[12:], 0xffffffff)
+		_, err := Loader{}.Load(context.Background(), readerFor(t, raw))
+		if err == nil || !strings.Contains(err.Error(), "coff: invalid symbol table") {
+			t.Fatalf("expected invalid symbol table error, got %v", err)
+		}
+	})
+
+	t.Run("missing_symbol_table_offset", func(t *testing.T) {
+		raw := object()
+		binary.LittleEndian.PutUint32(raw[8:], 0)
+		binary.LittleEndian.PutUint32(raw[12:], 1)
+		_, err := Loader{}.Load(context.Background(), readerFor(t, raw))
+		if err == nil || !strings.Contains(err.Error(), "coff: missing symbol table offset") {
+			t.Fatalf("expected missing symbol table offset error, got %v", err)
+		}
+	})
 }
