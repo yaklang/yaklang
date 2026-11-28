@@ -53,6 +53,14 @@ func loadLowIRCases(t *testing.T) []lowIRCase {
 	return cases
 }
 
+func TestConvertRejectsFunctionWithoutBlocks(t *testing.T) {
+	ir := &core.LowIR{Functions: []core.Function{{Name: "empty", Address: 0x1000}}}
+	_, err := Convert(context.Background(), ir)
+	if err == nil || err.Error() != "lowir2ssa: function empty at 0x1000 has no basic blocks" {
+		t.Fatalf("expected a missing basic blocks error, got %v", err)
+	}
+}
+
 func TestLowIRToSSAIRFixtures(t *testing.T) {
 	cases := loadLowIRCases(t)
 	if len(cases) == 0 {

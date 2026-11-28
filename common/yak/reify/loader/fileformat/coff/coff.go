@@ -103,7 +103,7 @@ func (Loader) Load(ctx context.Context, reader *core.ByteReader) (*core.Artifact
 	machine := binary.LittleEndian.Uint16(header)
 	sections := int(binary.LittleEndian.Uint16(header[2:]))
 	symbolOffset := uint64(binary.LittleEndian.Uint32(header[8:]))
-	symbolCount := int(binary.LittleEndian.Uint32(header[12:]))
+	symbolCount := uint64(binary.LittleEndian.Uint32(header[12:]))
 	optionalSize := uint64(binary.LittleEndian.Uint16(header[16:]))
 
 	target := core.Target{
@@ -116,6 +116,14 @@ func (Loader) Load(ctx context.Context, reader *core.ByteReader) (*core.Artifact
 	}
 	if target.Architecture == core.ArchUnknown {
 		return nil, fmt.Errorf("coff: unsupported machine 0x%04x", machine)
+	}
+	if symbolCount > 0 {
+		if symbolOffset == 0 {
+			return nil, fmt.Errorf("coff: missing symbol table offset")
+		}
+		if err := reader.CheckRange(symbolOffset, symbolCount*symbolSize); err != nil {
+			return nil, fmt.Errorf("coff: invalid symbol table: %w", err)
+		}
 	}
 
 	image := &core.Image{ObjectType: "COFF"}
@@ -191,11 +199,11 @@ func (Loader) Load(ctx context.Context, reader *core.ByteReader) (*core.Artifact
 
 // readStringTable reads the string table that follows the symbol table. Its
 // first four bytes hold its own size, so a zero or absent table is empty.
-func readStringTable(reader *core.ByteReader, symbolOffset uint64, symbolCount int) []byte {
+func readStringTable(reader *core.ByteReader, symbolOffset, symbolCount uint64) []byte {
 	if symbolOffset == 0 {
 		return nil
 	}
-	start := symbolOffset + uint64(symbolCount)*symbolSize
+	start := symbolOffset + symbolCount*symbolSize
 	header, err := reader.Bytes(start, 4)
 	if err != nil || len(header) < 4 {
 		return nil
@@ -232,11 +240,11 @@ func sectionName(entry []byte, names []byte) string {
 // readSymbols reads the symbol table and returns the defined symbols together
 // with the start addresses of the functions. A symbol value is relative to its
 // section, so the section base is added.
-func readSymbols(reader *core.ByteReader, offset uint64, count int, names []byte, bases []uint64, sectionNames []string, sections []core.Section) ([]sym.Symbol, []uint64) {
-	result := make([]sym.Symbol, 0, count)
-	starts := make([]uint64, 0)
-	for index := 0; index < count; index++ {
-		entry, err := reader.Bytes(offset+uint64(index)*symbolSize, symbolSize)
+func readSymbols(reader *core.ByteReader, offset, count uint64, names []byte, bases []uint64, sectionNames []string, sections []core.Section) ([]sym.Symbol, []uint64) {
+	var result []sym.Symbol
+	var starts []uint64
+	for index := uint64(0); index < count; index++ {
+		entry, err := reader.Bytes(offset+index*symbolSize, symbolSize)
 		if err != nil || len(entry) < symbolSize {
 			break
 		}

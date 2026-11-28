@@ -236,8 +236,11 @@ type converter struct {
 }
 
 func (c *converter) convertFunction(function core.Function) error {
-	c.sourceFunction = function
 	name := functionName(function)
+	if len(function.Blocks) == 0 {
+		return fmt.Errorf("lowir2ssa: function %s at 0x%x has no basic blocks", name, function.Address)
+	}
+	c.sourceFunction = function
 	ssaFunction := c.program.NewFunction(name)
 	metadata := ""
 	if function.Boundary != "" {

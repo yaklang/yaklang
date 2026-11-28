@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -171,6 +172,14 @@ func TestLoadLongSymbolName(t *testing.T) {
 	}
 	if got := artifact.Image.Symbols[0].Kind; got != sym.SymbolFunction {
 		t.Fatalf("kind = %v", got)
+	}
+}
+
+func TestLoadRejectsIncompleteSymbolRecord(t *testing.T) {
+	data := object()
+	_, err := Loader{}.Load(context.Background(), readerFor(t, data[:len(data)-1]))
+	if err == nil || !strings.Contains(err.Error(), "coff: invalid symbol table") {
+		t.Fatalf("expected a symbol table error, got %v", err)
 	}
 }
 
