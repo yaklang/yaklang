@@ -25,6 +25,26 @@ func (c *UnlimitedChan[T]) FeedBlock(item T) {
 	c.innerIn <- item
 }
 
+// FeedWithDone writes item and blocks while the channel is full, as FeedBlock
+// does. It gives up and returns false once done is closed.
+//
+// FeedBlock alone can block forever after this channel's reader goroutine has
+// exited: the reader leaves on context cancellation, nobody closes innerIn,
+// and a writer keeps waiting for a free slot that never comes. Callers that own
+// a cancellation context must use this method so shutdown unblocks them.
+func (c *UnlimitedChan[T]) FeedWithDone(item T, done <-chan struct{}) (ok bool) {
+	if done == nil {
+		c.innerIn <- item
+		return true
+	}
+	select {
+	case c.innerIn <- item:
+		return true
+	case <-done:
+		return false
+	}
+}
+
 func (c *UnlimitedChan[T]) SafeFeed(i T) {
 	_ = c.SafeFeedWithResult(i)
 }

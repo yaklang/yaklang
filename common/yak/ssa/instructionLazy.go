@@ -471,6 +471,30 @@ func (lz *LazyInstruction) SetId(id int64) {
 	lz.Instruction.SetId(id)
 }
 
+func (lz *LazyInstruction) GetSourceFileHash() string {
+	if lz == nil || lz.ir == nil {
+		return ""
+	}
+	return lz.ir.SourceCodeHash
+}
+
+// GetSourceFilePath resolves the source path from the lazy IR metadata without
+// materializing the instruction and its referenced values.
+func (lz *LazyInstruction) GetSourceFilePath() (string, bool) {
+	hash := lz.GetSourceFileHash()
+	if hash == "" || lz.prog == nil {
+		return "", false
+	}
+	editor, ok := lz.prog.GetEditorByHash(hash)
+	if !ok || editor == nil {
+		return "", false
+	}
+	if path := editor.GetFilePath(); path != "" {
+		return path, true
+	}
+	return editor.GetUrl(), true
+}
+
 func (lz *LazyInstruction) GetRange() *memedit.Range {
 	lz.check()
 	return lz.getRange(lz.Self())
