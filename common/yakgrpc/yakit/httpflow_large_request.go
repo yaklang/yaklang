@@ -373,7 +373,9 @@ func spillLargeHTTPFlowRequestIfNeeded(packet []byte) (largeRequestSpillResult, 
 	bodyFP.Close()
 
 	notice := []byte(fmt.Sprintf(storedHTTPFlowLargeRequestTruncateNotice, utils.ByteSize(uint64(len(body)))))
-	stored := lowhttp.ReplaceHTTPPacketBody([]byte(header), notice, false)
+	// 保留原始 Content-Length：notice 只是占位，真正上线时 body 会被 {{file(...)}}
+	// 渲染回原始字节，CL 必须与渲染后的 body 一致（否则「不修复数据包」会发出错包）。
+	stored := lowhttp.ReplaceHTTPPacketBodyKeepContentLength([]byte(header), notice)
 
 	res.StoredPacket = stored
 	res.IsTooLarge = true
@@ -408,7 +410,7 @@ func BuildFuzzableHTTPFlowRequestPacket(storedPacket []byte, bodyFile string) ([
 			if err != nil {
 				return nil, err
 			}
-			fuzzable = lowhttp.ReplaceHTTPPacketBody([]byte(header), []byte(tag), false)
+			fuzzable = lowhttp.ReplaceHTTPPacketBodyKeepContentLength([]byte(header), []byte(tag))
 		case IsMultipartSpillRequestPacket(storedPacket):
 			var err error
 			fuzzable, err = buildFuzzableMultipartRequestPacket(storedPacket, bodyFile)

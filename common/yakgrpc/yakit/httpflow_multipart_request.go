@@ -355,7 +355,9 @@ func spillMultipartFilesIfNeededWithOps(packet []byte, ops multipartSpillOps) (m
 	// io.Pipe) and LoadHTTPFlowRequestPacket.
 	bodyPath := filepath.Join(dir, res.Manifest[0].File)
 
-	stored := lowhttp.ReplaceHTTPPacketBody([]byte(header), skeletonBuf.Bytes(), false)
+	// 保留原始 Content-Length：skeleton 里的 marker 随后会被替换成 {{file(...)}}，
+	// 渲染后 body 与原始 multipart body 字节一致，CL 必须保持在原始值上。
+	stored := lowhttp.ReplaceHTTPPacketBodyKeepContentLength([]byte(header), skeletonBuf.Bytes())
 	res.StoredPacket = stored
 	res.IsTooLarge = true
 	res.HeaderFile = headerPath

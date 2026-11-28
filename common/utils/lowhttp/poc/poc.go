@@ -550,9 +550,9 @@ func WithRedirectTimes(t int) PocConfigOption {
 	}
 }
 
-// noFixContentLength 是一个请求选项参数，用于指定是否修复响应报文中的 Content-Length 字段，默认为 false 即会自动修复Content-Length字段
+// noFixContentLength 是一个请求选项参数，用于指定是否不修复报文，默认为 false 即会自动修复 Content-Length 等字段
 // 参数:
-//   - b: 为 true 时不自动修复 Content-Length
+//   - b: 为 true 时请求报文原样发送、响应报文保留服务端原始字节（不解码 Content-Encoding、不修 CL/Content-Type）
 //
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
@@ -2734,8 +2734,10 @@ func HTTP(i interface{}, opts ...PocConfigOption) (rsp []byte, req []byte, err e
 	if err != nil {
 		return nil, nil, err
 	}
-	noFixContentLength := config.NoFixContentLength != nil && *config.NoFixContentLength
-	return response.RawPacket, lowhttp.FixHTTPPacketCRLF(response.RawRequest, noFixContentLength), err
+	// response.RawRequest 已经是 lowhttp 实际发出的请求报文（noFix 时原样返回，否则已经修复过），
+	// 不要再调一次 FixHTTPPacketCRLF：chunked/multipart 修复并不幂等，
+	// 重复修复会把 chunk extension 越拼越长（例如 `5;foo=bar` -> `5;foo=bar;foo=bar`）。
+	return response.RawPacket, response.RawRequest, err
 }
 
 // Do 向指定 URL 发送指定请求方法的请求并且返回响应结构体，请求结构体以及错误，它的是第一个参数是请求方法，第二个参数 URL 字符串，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置超时时间，或者修改请求报文等

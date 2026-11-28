@@ -952,6 +952,15 @@ func WithUseMITMRule(b bool) LowhttpOpt {
 	}
 }
 
+// WithNoFixContentLength 设置「不修复数据包」模式。
+//
+// 为 true 时：
+//   - 请求报文按调用方提供的字节原样发送，不做 CRLF 归一化、不重算 Content-Length、
+//     不重新编码 chunked body、不补全 multipart boundary（保持 smuggle/pipeline 语义）；
+//   - 响应报文保留服务端原始字节，不自动修复 Content-Type / Content-Length，
+//     也不解码 Content-Encoding。
+//
+// 默认为 false，即保持原有的自动修复行为。
 func WithNoFixContentLength(noFixContentLength bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.NoFixContentLength = noFixContentLength

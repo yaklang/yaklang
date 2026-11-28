@@ -421,14 +421,16 @@ func ConvertHTTPRequestToFuzzTag(i []byte) []byte {
 			return i
 		}
 		body = buf.Bytes()
-		return ReplaceHTTPPacketBody([]byte(header), body, false)
+		// {{unquote(...)}} 渲染回原始字节，此时不能重算 Content-Length，
+		// 否则默认模式下靠 lowhttp 修复、而「不修复数据包」下会发出 CL 不匹配的包。
+		return ReplaceHTTPPacketBodyKeepContentLength([]byte(header), body)
 	}
 
 	if !bodyNeedsUnquote(body) {
 		return i
 	}
 	body = []byte(ToUnquoteFuzzTagForce(body))
-	return ReplaceHTTPPacketBody([]byte(header), body, false)
+	return ReplaceHTTPPacketBodyKeepContentLength([]byte(header), body)
 }
 
 func bodyNeedsUnquote(body []byte) bool {
