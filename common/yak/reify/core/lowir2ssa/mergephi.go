@@ -32,7 +32,7 @@ func (c *converter) planMergePhis(function core.Function) {
 	succs := make(map[core.BlockID][]core.BlockID, len(function.Blocks))
 	for _, block := range function.Blocks {
 		for _, target := range blockSuccessors(block) {
-			if !known[target] || target == block.ID {
+			if !known[target] {
 				continue
 			}
 			succs[block.ID] = appendUniqueBlock(succs[block.ID], target)

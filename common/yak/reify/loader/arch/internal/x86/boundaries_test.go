@@ -11,7 +11,7 @@ import (
 )
 
 func TestDiscoverBoundariesManySymbolsFastAndNonOverlappingGap(t *testing.T) {
-	const count = 8000
+	const count = 10000
 	codeSize := uint64(count*16 + 64)
 	code := bytes.Repeat([]byte{0xc3}, int(codeSize))
 	// Gap functions aligned at 16 bytes after symbol functions (push rbp; mov rbp, rsp; ret).
@@ -43,8 +43,8 @@ func TestDiscoverBoundariesManySymbolsFastAndNonOverlappingGap(t *testing.T) {
 	if elapsed := time.Since(start); elapsed > 2*time.Second {
 		t.Fatalf("discoverBoundaries took too long: %v", elapsed)
 	}
-	if len(res.Functions) < count {
-		t.Fatalf("got %d functions, want >= %d", len(res.Functions), count)
+	if len(res.Functions) < count+2 {
+		t.Fatalf("got %d functions, want at least %d including the two in the gap", len(res.Functions), count+2)
 	}
 	for i := 0; i+1 < len(res.Functions); i++ {
 		cur := res.Functions[i]

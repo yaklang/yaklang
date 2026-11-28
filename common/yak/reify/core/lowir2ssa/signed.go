@@ -2,6 +2,7 @@ package lowir2ssa
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -194,7 +195,18 @@ func orderedBinaryFolds(op ssa.BinaryOpcode, signed bool, left, right *ssa.Const
 			if b == 0 {
 				return 0, true
 			}
+			if a == math.MinInt64 && b == -1 {
+				return 0, false
+			}
 			return a / b, true
+		case ssa.OpMod:
+			if b == 0 {
+				return 0, true
+			}
+			if a == math.MinInt64 && b == -1 {
+				return 0, false
+			}
+			return a % b, true
 		case ssa.OpShr:
 			if b < 0 || b >= 64 {
 				return 0, false
@@ -217,6 +229,11 @@ func orderedBinaryFolds(op ssa.BinaryOpcode, signed bool, left, right *ssa.Const
 			return 0, true
 		}
 		return int64(a / b), true
+	case ssa.OpMod:
+		if b == 0 {
+			return 0, true
+		}
+		return int64(a % b), true
 	case ssa.OpShr:
 		if b >= 64 {
 			return 0, false

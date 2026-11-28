@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
@@ -189,8 +190,15 @@ func parsePECOFFSymbols(file *pe.File, image *core.Image) {
 			continue
 		}
 		section := file.Sections[item.SectionNumber-1]
-		if section.Characteristics&(peSectionCode|peSectionExecute) == 0 {
-			continue
+		isCode := section.Characteristics&(peSectionCode|peSectionExecute) != 0
+		if !isCode {
+			if item.Name == "" || item.Name == section.Name || strings.HasPrefix(item.Name, ".") {
+				continue
+			}
+			// Keep external (2) or static (3) object symbols; skip section/auxiliary labels.
+			if item.StorageClass != 2 && item.StorageClass != 3 {
+				continue
+			}
 		}
 		// A COFF value is an offset inside its section, and a linked image adds
 		// the image base to the section address. Requiring a non-zero value would
@@ -200,10 +208,14 @@ func parsePECOFFSymbols(file *pe.File, image *core.Image) {
 			continue
 		}
 		seen[address] = true
+		kind := sym.SymbolObject
+		if isCode {
+			kind = sym.SymbolFunction
+		}
 		image.Symbols = append(image.Symbols, sym.Symbol{
 			Name:    item.Name,
 			Address: address,
-			Kind:    sym.SymbolFunction,
+			Kind:    kind,
 		})
 	}
 }

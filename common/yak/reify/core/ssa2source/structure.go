@@ -296,7 +296,7 @@ func (s *structurer) dominates(header, node int64) bool {
 func (s *structurer) findLoops() {
 	for _, tail := range s.order {
 		for _, header := range s.succs[tail] {
-			if header == tail || !s.dominates(header, tail) {
+			if !s.dominates(header, tail) {
 				continue
 			}
 			loop := s.loops[header]
@@ -309,23 +309,26 @@ func (s *structurer) findLoops() {
 			s.collectLoopBody(loop, tail)
 		}
 	}
-	for _, header := range s.order {
-		loop := s.loops[header]
-		if loop == nil {
-			continue
-		}
-		for _, node := range s.order {
-			if !loop.body[node] {
+	if len(s.loops) == 0 {
+		return
+	}
+	position := make(map[int64]int, len(s.order))
+	for index, node := range s.order {
+		position[node] = index
+	}
+	for _, loop := range s.loops {
+		first := len(s.order)
+		for node := range loop.body {
+			index, known := position[node]
+			if !known || index >= first {
 				continue
 			}
 			for _, succ := range s.succs[node] {
-				if !loop.body[succ] {
+				if succ != 0 && !loop.body[succ] {
+					first = index
 					loop.exit = succ
 					break
 				}
-			}
-			if loop.exit != 0 {
-				break
 			}
 		}
 	}
@@ -567,6 +570,22 @@ func (s *structurer) emitLoop(loop *loopInfo, indent string, stop map[int64]bool
 	conditionID := int64(0)
 	if ifInstruction != nil {
 		conditionID = ifInstruction.Cond
+	}
+	if len(loop.body) == 1 && bodyStart == loop.header {
+		s.emitLoopPhis(loop, header, indent, false)
+		fmt.Fprintf(s.text, "%swhile (true) {\n", indent)
+		s.renderBlockInstructions(header, indent+"  ", conditionID)
+		if ifInstruction != nil && exit != 0 {
+			fmt.Fprintf(s.text, "%s  if (!(%s)) {\n", indent, condition)
+			fmt.Fprintf(s.text, "%s    break;\n", indent)
+			fmt.Fprintf(s.text, "%s  }\n", indent)
+		}
+		s.emitLoopPhis(loop, header, indent+"  ", true)
+		fmt.Fprintf(s.text, "%s}\n", indent)
+		if exit != 0 {
+			s.emitRegion(exit, indent, stop)
+		}
+		return
 	}
 	s.emitLoopPhis(loop, header, indent, false)
 	s.renderBlockInstructions(header, indent, conditionID)

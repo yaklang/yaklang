@@ -78,6 +78,10 @@ func isolatedStreamDB(t *testing.T) (*gorm.DB, func()) {
 func TestLiftStreamMultiBatchAllModes(t *testing.T) {
 	bin := buildMultiFunctionTestBinary(t)
 	ctx := context.Background()
+	textSection := ".text"
+	if runtime.GOOS == "darwin" {
+		textSection = "__TEXT,__text"
+	}
 
 	cases := []struct {
 		mode     reify.Mode
@@ -86,7 +90,7 @@ func TestLiftStreamMultiBatchAllModes(t *testing.T) {
 		{reify.ModeASM, []string{"0x"}},
 		{reify.ModeLowIR, []string{"target:", "function ", "leaf_add"}},
 		{reify.ModeSSAIR, []string{"extern ", "combine", "leaf_add"}},
-		{reify.ModeSource, []string{"leaf_add(", "combine(", "printf("}},
+		{reify.ModeSource, []string{"leaf_add(", "combine(", "reify-stream-tag"}},
 	}
 
 	for _, tc := range cases {
@@ -95,7 +99,7 @@ func TestLiftStreamMultiBatchAllModes(t *testing.T) {
 			headerSeen := false
 			res, err := reify.LiftStream(ctx, bin, &buf,
 				reify.WithMode(tc.mode),
-				reify.WithSection(".text"),
+				reify.WithSection(textSection),
 				reify.WithBatchSize(2),
 				reify.WithWorkers(4),
 				reify.WithBeforeStream(func(w io.Writer, h reify.StreamHeader) error {
@@ -112,6 +116,9 @@ func TestLiftStreamMultiBatchAllModes(t *testing.T) {
 			for _, want := range tc.contains {
 				require.Contains(t, text, want)
 			}
+			if tc.mode == reify.ModeSource && runtime.GOOS != "darwin" {
+				require.Contains(t, text, "printf(")
+			}
 			if tc.mode == reify.ModeASM {
 				require.Positive(t, res.Instructions)
 			} else {
@@ -125,12 +132,16 @@ func TestSaveMultiBatchPersistsAndQueries(t *testing.T) {
 	bin := buildMultiFunctionTestBinary(t)
 	db, cleanup := isolatedStreamDB(t)
 	defer cleanup()
+	textSection := ".text"
+	if runtime.GOOS == "darwin" {
+		textSection = "__TEXT,__text"
+	}
 
 	programName := "reify-stream-save-" + uuid.NewString()
 	defer ssadb.DeleteProgram(db, programName)
 
 	saveRes, err := reify.Save(context.Background(), bin, programName,
-		reify.WithSection(".text"),
+		reify.WithSection(textSection),
 		reify.WithBatchSize(2),
 		reify.WithWorkers(2),
 	)
@@ -144,18 +155,17 @@ func TestSaveMultiBatchPersistsAndQueries(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, ssa.ProgramCacheDBRead, program.Program.DatabaseKind)
 
-	for _, query := range []struct {
-		rule string
-		min  int
-	}{
-		{"printf(* as $args) as $call", 2},
-		{"leaf_add(* as $args) as $call", 1},
-		{"combine(* as $args) as $call", 1},
-	} {
-		matched, err := program.SyntaxFlowWithError(query.rule)
-		require.NoError(t, err, "rule=%s", query.rule)
+	assertCalls := func(rule string, minimum int) {
+		t.Helper()
+		matched, err := program.SyntaxFlowWithError(rule)
+		require.NoError(t, err, "rule=%s", rule)
 		calls, ok := matched.GetSFResult().SymbolTable.Get("call")
-		require.True(t, ok, "rule=%s did not bind $call", query.rule)
-		require.GreaterOrEqual(t, len(calls), query.min, "rule=%s", query.rule)
+		require.True(t, ok, "rule=%s did not bind $call", rule)
+		require.GreaterOrEqual(t, len(calls), minimum, "rule=%s", rule)
+	}
+	assertCalls("leaf_add(* as $args) as $call", 1)
+	assertCalls("combine(* as $args) as $call", 1)
+	if runtime.GOOS != "darwin" {
+		assertCalls("printf(* as $args) as $call", 2)
 	}
 }

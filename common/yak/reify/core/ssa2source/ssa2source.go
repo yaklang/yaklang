@@ -688,6 +688,9 @@ func valueUsedSeen(value ssa.Value, seen map[int64]bool) bool {
 	for _, user := range node.GetUsers() {
 		switch typed := user.(type) {
 		case *ssa.BinOp:
+			if typed.Op == ssa.OpStore {
+				return true
+			}
 			if binaryFoldsAway(typed) {
 				continue
 			}
@@ -695,6 +698,9 @@ func valueUsedSeen(value ssa.Value, seen map[int64]bool) bool {
 				return true
 			}
 		case *ssa.UnOp:
+			if typed.Op == ssa.OpLoad || typed.Op == ssa.OpSpill {
+				return true
+			}
 			if valueUsedSeen(typed, seen) {
 				return true
 			}
