@@ -23,15 +23,65 @@ import (
 )
 
 const (
-	defaultStreamBatchSize = 64
-	defaultSSABatchSize    = 32
-	defaultSaveBatchSize   = 256
-	defaultMaxWorkers      = 8
-	defaultSSAMaxWorkers   = 4
-	streamBufSize          = 256 * 1024
-	maxPooledBatchBufCap   = 4 << 20
-	largeProjectThreshold  = 16 << 20
+	defaultStreamBatchSize     = 64
+	defaultStreamBatchMaxBytes = 128 << 10
+	defaultSSABatchSize        = 64
+	defaultSSABatchMaxBytes    = 32 << 10
+	defaultSaveBatchSize       = 256
+	defaultSaveBatchMaxBytes   = 256 << 10
+	heavyBatchBytesThreshold   = 64 << 10
+	defaultMaxWorkers          = 8
+	defaultSSAMaxWorkers       = 8
+	maxOrderedWindow           = 32
+	streamBufSize              = 256 * 1024
+	maxPooledBatchBufCap       = 4 << 20
+	largeProjectThreshold      = 16 << 20
 )
+
+type funcBatch struct {
+	start     int
+	end       int
+	codeBytes uint64
+}
+
+func buildBatches(boundaries []core.FunctionBoundary, explicitBatchSize, defaultMaxFuncs int, defaultMaxBytes uint64) []funcBatch {
+	if len(boundaries) == 0 {
+		return nil
+	}
+	if explicitBatchSize > 0 {
+		batches := make([]funcBatch, 0, (len(boundaries)+explicitBatchSize-1)/explicitBatchSize)
+		for start := 0; start < len(boundaries); start += explicitBatchSize {
+			end := start + explicitBatchSize
+			if end > len(boundaries) {
+				end = len(boundaries)
+			}
+			var sum uint64
+			for i := start; i < end; i++ {
+				sum += boundaries[i].Size
+			}
+			batches = append(batches, funcBatch{start: start, end: end, codeBytes: sum})
+		}
+		return batches
+	}
+	if defaultMaxFuncs < 1 {
+		defaultMaxFuncs = 1
+	}
+	batches := make([]funcBatch, 0, (len(boundaries)+defaultMaxFuncs-1)/defaultMaxFuncs)
+	for i := 0; i < len(boundaries); {
+		start := i
+		var sum uint64
+		for i < len(boundaries) && (i-start) < defaultMaxFuncs {
+			sz := boundaries[i].Size
+			if i > start && defaultMaxBytes > 0 && sum+sz > defaultMaxBytes {
+				break
+			}
+			sum += sz
+			i++
+		}
+		batches = append(batches, funcBatch{start: start, end: i, codeBytes: sum})
+	}
+	return batches
+}
 
 var batchBufPool = sync.Pool{
 	New: func() any {
@@ -173,23 +223,21 @@ func LiftStream(ctx context.Context, path string, w io.Writer, options ...Option
 	}
 
 	workers := resolveWorkers(settings.Workers, defaultMaxWorkers)
-	batchSize := resolveBatchSize(settings.BatchSize, defaultStreamBatchSize)
 	if settings.Mode == ModeSSAIR || settings.Mode == ModeSource {
 		workers = resolveWorkers(settings.Workers, defaultSSAMaxWorkers)
-		batchSize = resolveBatchSize(settings.BatchSize, defaultSSABatchSize)
 	}
 
 	switch settings.Mode {
 	case ModeASM:
-		if err := streamASM(ctx, bw, emitHeader, artifact, boundaries, asmOptions, workers, batchSize, res); err != nil {
+		if err := streamASM(ctx, bw, emitHeader, artifact, boundaries, asmOptions, workers, settings.BatchSize, res); err != nil {
 			return nil, err
 		}
 	case ModeLowIR:
-		if err := streamLowIR(ctx, bw, emitHeader, artifact, boundaries, asmOptions, workers, batchSize, res); err != nil {
+		if err := streamLowIR(ctx, bw, emitHeader, artifact, boundaries, asmOptions, workers, settings.BatchSize, res); err != nil {
 			return nil, err
 		}
 	case ModeSSAIR, ModeSource:
-		if err := streamSSAOrSource(ctx, bw, emitHeader, artifact, boundaries, asmOptions, settings, workers, batchSize, res); err != nil {
+		if err := streamSSAOrSource(ctx, bw, emitHeader, artifact, boundaries, asmOptions, settings, workers, res); err != nil {
 			return nil, err
 		}
 	}
@@ -244,16 +292,16 @@ func Save(ctx context.Context, path, stagedName string, options ...Option) (*Sav
 		region = r
 	}
 
-	batchSize := resolveBatchSize(settings.BatchSize, defaultSaveBatchSize)
+	batches := buildBatches(boundaries, settings.BatchSize, defaultSaveBatchSize, defaultSaveBatchMaxBytes)
 	workers := resolveWorkers(settings.Workers, defaultSSAMaxWorkers)
-	totalBatches := (len(boundaries) + batchSize - 1) / batchSize
+	totalBatches := len(batches)
 	stringAt := stringAtFunc(artifact)
 	baseConvertOpts := buildBaseConvertOptions(artifact, settings, ModeSSAIR)
 
 	var summary *ssapass.ProgramSummary
 	if totalBatches > 1 && ssapass.HasInterproceduralPass(settings.SSAPasses) {
 		var err error
-		summary, err = buildProgramSummary(ctx, artifact, boundaries, asmOptions, baseConvertOpts, workers, batchSize)
+		summary, err = buildProgramSummary(ctx, artifact, boundaries, batches, asmOptions, baseConvertOpts, workers)
 		if err != nil {
 			return nil, err
 		}
@@ -295,21 +343,52 @@ func Save(ctx context.Context, path, stagedName string, options ...Option) (*Sav
 		Diagnostics:   languageLimitDiagnostics(artifact),
 	}
 
+	var prefetched <-chan savePrefetchItem
+	var stopPrefetch func()
+	if totalBatches > 1 && workers > 1 {
+		prefetched, stopPrefetch = startSavePrefetch(ctx, artifact, boundaries, batches, asmOptions, workers)
+		defer stopPrefetch()
+	}
+
 	nextID := core.FunctionID(1)
 	for b := 0; b < totalBatches; b++ {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		start, end := batchBounds(len(boundaries), b, batchSize)
+		batch := batches[b]
 		unitKey := fmt.Sprintf("reify-batch-%d", b)
 		program.BeginCompileUnit(unitKey)
 		program.Cache.DisableInstructionSpill()
 
-		parsed, err := asm2lowir.ParseBatch(ctx, artifact, boundaries, start, end, nextID, asmOptions...)
-		if err != nil {
+		var parsed *asm2lowir.Result
+		var parseErr error
+		if prefetched != nil {
+			select {
+			case item, ok := <-prefetched:
+				if !ok {
+					parseErr = ctx.Err()
+					if parseErr == nil {
+						parseErr = fmt.Errorf("save: prefetch closed unexpectedly at batch %d", b)
+					}
+				} else {
+					parsed, parseErr = item.parsed, item.err
+				}
+			case <-ctx.Done():
+				parseErr = ctx.Err()
+			}
+			if parseErr == nil && parsed != nil && parsed.IR != nil && nextID != core.FunctionID(batch.start+1) {
+				// Keep sequential FunctionID assignment contiguous if an earlier batch produced 0 functions.
+				for idx := range parsed.IR.Functions {
+					parsed.IR.Functions[idx].ID = nextID + core.FunctionID(idx)
+				}
+			}
+		} else {
+			parsed, parseErr = asm2lowir.ParseBatch(ctx, artifact, boundaries, batch.start, batch.end, nextID, asmOptions...)
+		}
+		if parseErr != nil {
 			program.Cache.EnableInstructionSpill()
 			program.EndCompileUnit()
-			return nil, err
+			return nil, parseErr
 		}
 		res.Diagnostics = append(res.Diagnostics, parsed.Diagnostics...)
 		if len(parsed.IR.Functions) == 0 {
@@ -379,17 +458,17 @@ func Save(ctx context.Context, path, stagedName string, options ...Option) (*Sav
 	return res, nil
 }
 
-func streamASM(ctx context.Context, w io.Writer, emitHeader func() error, artifact *core.Artifact, boundaries []core.FunctionBoundary, asmOptions []asm2lowir.Option, workers, batchSize int, res *StreamResult) error {
-	totalBatches := (len(boundaries) + batchSize - 1) / batchSize
+func streamASM(ctx context.Context, w io.Writer, emitHeader func() error, artifact *core.Artifact, boundaries []core.FunctionBoundary, asmOptions []asm2lowir.Option, workers, explicitBatchSize int, res *StreamResult) error {
+	batches := buildBatches(boundaries, explicitBatchSize, defaultStreamBatchSize, defaultStreamBatchMaxBytes)
 	type asmChunk struct {
 		text  string
 		insts int
 		diags []core.Diagnostic
 	}
-	err := runOrderedBatches(ctx, totalBatches, workers,
+	err := runOrderedBatches(ctx, batches, workers, maxOrderedWindow, 0,
 		func(batchCtx context.Context, b int) (asmChunk, error) {
-			start, end := batchBounds(len(boundaries), b, batchSize)
-			dis, err := asm2lowir.DisassembleBatch(batchCtx, artifact, boundaries, start, end, asmOptions...)
+			batch := batches[b]
+			dis, err := asm2lowir.DisassembleBatch(batchCtx, artifact, boundaries, batch.start, batch.end, asmOptions...)
 			if err != nil {
 				return asmChunk{}, err
 			}
@@ -398,7 +477,7 @@ func streamASM(ctx context.Context, w io.Writer, emitHeader func() error, artifa
 		func(_ int, chunk asmChunk) error {
 			res.Instructions += chunk.insts
 			res.Diagnostics = append(res.Diagnostics, chunk.diags...)
-			if chunk.insts == 0 && res.Instructions == 0 && totalBatches == 1 {
+			if chunk.insts == 0 && res.Instructions == 0 && len(batches) == 1 {
 				return nil
 			}
 			if err := emitHeader(); err != nil {
@@ -417,44 +496,74 @@ func streamASM(ctx context.Context, w io.Writer, emitHeader func() error, artifa
 	return nil
 }
 
-func streamLowIR(ctx context.Context, w io.Writer, emitHeader func() error, artifact *core.Artifact, boundaries []core.FunctionBoundary, asmOptions []asm2lowir.Option, workers, batchSize int, res *StreamResult) error {
-	totalBatches := (len(boundaries) + batchSize - 1) / batchSize
+func streamLowIR(ctx context.Context, w io.Writer, emitHeader func() error, artifact *core.Artifact, boundaries []core.FunctionBoundary, asmOptions []asm2lowir.Option, workers, explicitBatchSize int, res *StreamResult) error {
+	batches := buildBatches(boundaries, explicitBatchSize, defaultStreamBatchSize, defaultStreamBatchMaxBytes)
 	type lowirChunk struct {
-		ir    *core.LowIR
-		diags []core.Diagnostic
+		header string
+		body   *bytes.Buffer
+		funcs  int
+		blocks int
+		insts  int
+		values int
+		diags  []core.Diagnostic
 	}
 	headerPrinted := false
-	err := runOrderedBatches(ctx, totalBatches, workers,
-		func(batchCtx context.Context, b int) (lowirChunk, error) {
-			start, end := batchBounds(len(boundaries), b, batchSize)
-			parsed, err := asm2lowir.ParseBatch(batchCtx, artifact, boundaries, start, end, core.FunctionID(start+1), asmOptions...)
+	err := runOrderedBatches(ctx, batches, workers, maxOrderedWindow, 0,
+		func(batchCtx context.Context, b int) (*lowirChunk, error) {
+			batch := batches[b]
+			parsed, err := asm2lowir.ParseBatch(batchCtx, artifact, boundaries, batch.start, batch.end, core.FunctionID(batch.start+1), asmOptions...)
 			if err != nil {
-				return lowirChunk{}, err
+				return nil, err
 			}
-			return lowirChunk{ir: parsed.IR, diags: parsed.Diagnostics}, nil
+			chunk := &lowirChunk{diags: parsed.Diagnostics}
+			if parsed.IR == nil || len(parsed.IR.Functions) == 0 {
+				return chunk, nil
+			}
+			chunk.funcs = len(parsed.IR.Functions)
+			chunk.blocks = countBlocks(parsed.IR)
+			chunk.insts = countInstructions(parsed.IR)
+			chunk.values = countValues(parsed.IR)
+
+			var hdr bytes.Buffer
+			if err := lowirtext.FormatHeaderTo(&hdr, parsed.IR); err != nil {
+				return nil, err
+			}
+			chunk.header = hdr.String()
+
+			buf := acquireBatchBuf()
+			for _, fn := range parsed.IR.Functions {
+				if err := lowirtext.FormatFunctionTo(buf, fn); err != nil {
+					releaseBatchBuf(buf)
+					return nil, err
+				}
+			}
+			chunk.body = buf
+			return chunk, nil
 		},
-		func(_ int, chunk lowirChunk) error {
+		func(_ int, chunk *lowirChunk) error {
+			if chunk.body != nil {
+				defer releaseBatchBuf(chunk.body)
+			}
 			res.Diagnostics = append(res.Diagnostics, chunk.diags...)
-			if chunk.ir == nil || len(chunk.ir.Functions) == 0 {
+			if chunk.funcs == 0 {
 				return nil
 			}
-			res.Functions += len(chunk.ir.Functions)
-			res.Blocks += countBlocks(chunk.ir)
-			res.Instructions += countInstructions(chunk.ir)
-			res.Values += countValues(chunk.ir)
+			res.Functions += chunk.funcs
+			res.Blocks += chunk.blocks
+			res.Instructions += chunk.insts
+			res.Values += chunk.values
 			if !headerPrinted {
 				if err := emitHeader(); err != nil {
 					return err
 				}
-				if err := lowirtext.FormatHeaderTo(w, chunk.ir); err != nil {
+				if _, err := io.WriteString(w, chunk.header); err != nil {
 					return err
 				}
 				headerPrinted = true
 			}
-			for _, fn := range chunk.ir.Functions {
-				if err := lowirtext.FormatFunctionTo(w, fn); err != nil {
-					return err
-				}
+			if chunk.body != nil && chunk.body.Len() > 0 {
+				_, err := chunk.body.WriteTo(w)
+				return err
 			}
 			return nil
 		},
@@ -468,8 +577,9 @@ func streamLowIR(ctx context.Context, w io.Writer, emitHeader func() error, arti
 	return nil
 }
 
-func streamSSAOrSource(ctx context.Context, w io.Writer, emitHeader func() error, artifact *core.Artifact, boundaries []core.FunctionBoundary, asmOptions []asm2lowir.Option, settings Config, workers, batchSize int, res *StreamResult) error {
-	totalBatches := (len(boundaries) + batchSize - 1) / batchSize
+func streamSSAOrSource(ctx context.Context, w io.Writer, emitHeader func() error, artifact *core.Artifact, boundaries []core.FunctionBoundary, asmOptions []asm2lowir.Option, settings Config, workers int, res *StreamResult) error {
+	batches := buildBatches(boundaries, settings.BatchSize, defaultSSABatchSize, defaultSSABatchMaxBytes)
+	totalBatches := len(batches)
 	stringAt := stringAtFunc(artifact)
 	baseConvertOpts := buildBaseConvertOptions(artifact, settings, settings.Mode)
 
@@ -514,7 +624,7 @@ func streamSSAOrSource(ctx context.Context, w io.Writer, emitHeader func() error
 	var summary *ssapass.ProgramSummary
 	if ssapass.HasInterproceduralPass(settings.SSAPasses) {
 		var err error
-		summary, err = buildProgramSummary(ctx, artifact, boundaries, asmOptions, baseConvertOpts, workers, batchSize)
+		summary, err = buildProgramSummary(ctx, artifact, boundaries, batches, asmOptions, baseConvertOpts, workers)
 		if err != nil {
 			return err
 		}
@@ -549,10 +659,10 @@ func streamSSAOrSource(ctx context.Context, w io.Writer, emitHeader func() error
 		diagnostics []core.Diagnostic
 	}
 
-	err := runOrderedBatches(ctx, totalBatches, workers,
+	err := runOrderedBatches(ctx, batches, workers, maxOrderedWindow, heavyBatchBytesThreshold,
 		func(batchCtx context.Context, b int) (*renderedBatch, error) {
-			start, end := batchBounds(len(boundaries), b, batchSize)
-			parsed, err := asm2lowir.ParseBatch(batchCtx, artifact, boundaries, start, end, core.FunctionID(start+1), asmOptions...)
+			batch := batches[b]
+			parsed, err := asm2lowir.ParseBatch(batchCtx, artifact, boundaries, batch.start, batch.end, core.FunctionID(batch.start+1), asmOptions...)
 			if err != nil {
 				return nil, err
 			}
@@ -658,46 +768,192 @@ func streamSSAOrSource(ctx context.Context, w io.Writer, emitHeader func() error
 	return nil
 }
 
-func buildProgramSummary(ctx context.Context, artifact *core.Artifact, boundaries []core.FunctionBoundary, asmOptions []asm2lowir.Option, baseConvertOpts []lowir2ssa.Option, workers, batchSize int) (*ssapass.ProgramSummary, error) {
-	totalBatches := (len(boundaries) + batchSize - 1) / batchSize
+type savePrefetchItem struct {
+	parsed *asm2lowir.Result
+	err    error
+}
+
+func startSavePrefetch(ctx context.Context, artifact *core.Artifact, boundaries []core.FunctionBoundary, batches []funcBatch, asmOptions []asm2lowir.Option, workers int) (<-chan savePrefetchItem, func()) {
+	pCtx, cancel := context.WithCancel(ctx)
+	ready := make(chan savePrefetchItem)
+
+	prefetchWorkers := workers
+	if prefetchWorkers > 2 {
+		prefetchWorkers = 2
+	}
+	windowSem := make(chan struct{}, prefetchWorkers)
+	slots := make([]chan savePrefetchItem, len(batches))
+	for i := range slots {
+		slots[i] = make(chan savePrefetchItem, 1)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for b, batch := range batches {
+			select {
+			case windowSem <- struct{}{}:
+			case <-pCtx.Done():
+				return
+			}
+			wg.Add(1)
+			go func(idx int, bt funcBatch) {
+				defer wg.Done()
+				parsed, err := asm2lowir.ParseBatch(pCtx, artifact, boundaries, bt.start, bt.end, core.FunctionID(bt.start+1), asmOptions...)
+				slots[idx] <- savePrefetchItem{parsed: parsed, err: err}
+			}(b, batch)
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer close(ready)
+		for b := range batches {
+			var item savePrefetchItem
+			select {
+			case item = <-slots[b]:
+			case <-pCtx.Done():
+				return
+			}
+			select {
+			case ready <- item:
+				<-windowSem
+			case <-pCtx.Done():
+				<-windowSem
+				return
+			}
+			if item.err != nil {
+				return
+			}
+		}
+	}()
+
+	stop := func() {
+		cancel()
+		wg.Wait()
+	}
+	return ready, stop
+}
+
+func buildProgramSummary(ctx context.Context, artifact *core.Artifact, boundaries []core.FunctionBoundary, batches []funcBatch, asmOptions []asm2lowir.Option, baseConvertOpts []lowir2ssa.Option, workers int) (*ssapass.ProgramSummary, error) {
+	if len(batches) == 0 {
+		summary := ssapass.NewProgramSummary()
+		summary.Finalize()
+		return summary, nil
+	}
+	if workers < 1 {
+		workers = 1
+	}
+	if workers > len(batches) {
+		workers = len(batches)
+	}
+
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	jobs := make(chan int)
+	heavyLimit := workers
+	if heavyLimit > 2 {
+		heavyLimit = 2
+	}
+	var heavySem chan struct{}
+	if heavyLimit < workers {
+		heavySem = make(chan struct{}, heavyLimit)
+	}
+
 	summary := ssapass.NewProgramSummary()
-	err := runOrderedBatches(ctx, totalBatches, workers,
-		func(batchCtx context.Context, b int) (*ssapass.ProgramSummary, error) {
-			start, end := batchBounds(len(boundaries), b, batchSize)
-			parsed, err := asm2lowir.ParseBatch(batchCtx, artifact, boundaries, start, end, core.FunctionID(start+1), asmOptions...)
-			if err != nil {
-				return nil, err
-			}
-			if len(parsed.IR.Functions) == 0 {
-				return nil, nil
-			}
-			conv, err := lowir2ssa.Convert(batchCtx, parsed.IR, baseConvertOpts...)
-			parsed = nil
-			if err != nil {
-				return nil, err
-			}
-			local := ssapass.NewProgramSummary()
-			local.CollectProgram(conv.Program)
-			return local, nil
-		},
-		func(_ int, local *ssapass.ProgramSummary) error {
-			if local != nil {
+	var mu sync.Mutex
+	var errOnce sync.Once
+	var firstErr error
+	setErr := func(err error) {
+		errOnce.Do(func() {
+			firstErr = err
+			cancel()
+		})
+	}
+
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for b := range jobs {
+				if runCtx.Err() != nil {
+					continue
+				}
+				batch := batches[b]
+				isHeavy := heavySem != nil && batch.codeBytes >= heavyBatchBytesThreshold
+				if isHeavy {
+					select {
+					case heavySem <- struct{}{}:
+					case <-runCtx.Done():
+						continue
+					}
+				}
+				parsed, err := asm2lowir.ParseBatch(runCtx, artifact, boundaries, batch.start, batch.end, core.FunctionID(batch.start+1), asmOptions...)
+				if err != nil {
+					if isHeavy {
+						<-heavySem
+					}
+					setErr(err)
+					continue
+				}
+				if len(parsed.IR.Functions) == 0 {
+					if isHeavy {
+						<-heavySem
+					}
+					continue
+				}
+				conv, err := lowir2ssa.Convert(runCtx, parsed.IR, baseConvertOpts...)
+				parsed = nil
+				if err != nil {
+					if isHeavy {
+						<-heavySem
+					}
+					setErr(err)
+					continue
+				}
+				local := ssapass.NewProgramSummary()
+				local.CollectProgram(conv.Program)
+				conv = nil
+				if isHeavy {
+					<-heavySem
+				}
+				mu.Lock()
 				summary.Merge(local)
+				mu.Unlock()
 			}
-			return nil
-		},
-	)
-	if err != nil {
+		}()
+	}
+
+dispatch:
+	for b := range batches {
+		select {
+		case jobs <- b:
+		case <-runCtx.Done():
+			break dispatch
+		}
+	}
+	close(jobs)
+	wg.Wait()
+
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	summary.Finalize()
 	return summary, nil
 }
 
-// runOrderedBatches executes totalBatches workers bounded by a semaphore acquired
-// before launching each batch and released only after consume finishes in order,
-// capping concurrent live batch memory to at most workers batches.
-func runOrderedBatches[T any](ctx context.Context, totalBatches, workers int, work func(context.Context, int) (T, error), consume func(int, T) error) error {
+// runOrderedBatches decouples CPU execution (workerSem) from in-order output
+// consumption (windowSem) and caps concurrent heavy batches via heavySem so
+// giant single functions never cause head-of-line stalling or memory spikes.
+func runOrderedBatches[T any](ctx context.Context, batches []funcBatch, workers, windowSize int, heavyThreshold uint64, work func(context.Context, int) (T, error), consume func(int, T) error) error {
+	totalBatches := len(batches)
 	if totalBatches == 0 {
 		return nil
 	}
@@ -707,6 +963,12 @@ func runOrderedBatches[T any](ctx context.Context, totalBatches, workers int, wo
 	if workers > totalBatches {
 		workers = totalBatches
 	}
+	if windowSize < workers {
+		windowSize = workers
+	}
+	if windowSize > totalBatches {
+		windowSize = totalBatches
+	}
 
 	type resultItem struct {
 		val T
@@ -715,7 +977,17 @@ func runOrderedBatches[T any](ctx context.Context, totalBatches, workers int, wo
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	sem := make(chan struct{}, workers)
+	windowSem := make(chan struct{}, windowSize)
+	workerSem := make(chan struct{}, workers)
+	heavyLimit := workers
+	if heavyLimit > 2 {
+		heavyLimit = 2
+	}
+	var heavySem chan struct{}
+	if heavyThreshold > 0 && heavyLimit < workers {
+		heavySem = make(chan struct{}, heavyLimit)
+	}
+
 	slots := make([]chan resultItem, totalBatches)
 	for i := range slots {
 		slots[i] = make(chan resultItem, 1)
@@ -727,48 +999,58 @@ func runOrderedBatches[T any](ctx context.Context, totalBatches, workers int, wo
 		defer wg.Done()
 		for b := 0; b < totalBatches; b++ {
 			select {
-			case sem <- struct{}{}:
+			case windowSem <- struct{}{}:
 			case <-runCtx.Done():
 				return
 			}
 			if err := runCtx.Err(); err != nil {
-				<-sem
+				<-windowSem
 				return
 			}
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
+				select {
+				case workerSem <- struct{}{}:
+				case <-runCtx.Done():
+					return
+				}
+				isHeavy := heavySem != nil && batches[idx].codeBytes >= heavyThreshold
+				if isHeavy {
+					select {
+					case heavySem <- struct{}{}:
+					case <-runCtx.Done():
+						<-workerSem
+						return
+					}
+				}
 				val, err := work(runCtx, idx)
+				if isHeavy {
+					<-heavySem
+				}
+				<-workerSem
 				slots[idx] <- resultItem{val: val, err: err}
 			}(b)
 		}
 	}()
 
-	var firstErr error
 	for b := 0; b < totalBatches; b++ {
 		var item resultItem
 		select {
 		case item = <-slots[b]:
 		case <-runCtx.Done():
-			<-sem
-			if firstErr == nil {
-				firstErr = runCtx.Err()
-			}
 			cancel()
 			wg.Wait()
-			return firstErr
+			return runCtx.Err()
 		}
 		if item.err != nil {
-			<-sem
-			if firstErr == nil {
-				firstErr = item.err
-			}
+			<-windowSem
 			cancel()
 			wg.Wait()
-			return firstErr
+			return item.err
 		}
 		err := consume(b, item.val)
-		<-sem
+		<-windowSem
 		if err != nil {
 			cancel()
 			wg.Wait()
@@ -823,22 +1105,6 @@ func resolveWorkers(workers, maxDefault int) int {
 		return maxDefault
 	}
 	return n
-}
-
-func resolveBatchSize(size, fallback int) int {
-	if size > 0 {
-		return size
-	}
-	return fallback
-}
-
-func batchBounds(total, batchIdx, batchSize int) (int, int) {
-	start := batchIdx * batchSize
-	end := start + batchSize
-	if end > total {
-		end = total
-	}
-	return start, end
 }
 
 func languageLimitDiagnostics(artifact *core.Artifact) []core.Diagnostic {

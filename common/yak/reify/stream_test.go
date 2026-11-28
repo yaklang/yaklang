@@ -176,3 +176,43 @@ func TestSaveMultiBatchPersistsAndQueries(t *testing.T) {
 		assertCalls("printf(* as $args) as $call", 2)
 	}
 }
+
+func TestLiftStreamCancellationAndMultiBatchMatchesSingleBatch(t *testing.T) {
+	bin := buildMultiFunctionTestBinary(t)
+	ctx := context.Background()
+	textSection := ".text"
+	if runtime.GOOS == "darwin" {
+		textSection = "__TEXT,__text"
+	}
+
+	var singleBuf, multiBuf bytes.Buffer
+	_, err := reify.LiftStream(ctx, bin, &singleBuf,
+		reify.WithMode(reify.ModeSource),
+		reify.WithSection(textSection),
+		reify.WithBatchSize(100000),
+		reify.WithWorkers(1),
+	)
+	require.NoError(t, err)
+	_, err = reify.LiftStream(ctx, bin, &multiBuf,
+		reify.WithMode(reify.ModeSource),
+		reify.WithSection(textSection),
+		reify.WithBatchSize(2),
+		reify.WithWorkers(4),
+	)
+	require.NoError(t, err)
+	for _, sym := range []string{"leaf_add(", "leaf_mul(", "combine("} {
+		require.Contains(t, singleBuf.String(), sym)
+		require.Contains(t, multiBuf.String(), sym)
+	}
+
+	cctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	var cancelled bytes.Buffer
+	_, err = reify.LiftStream(cctx, bin, &cancelled,
+		reify.WithMode(reify.ModeSSAIR),
+		reify.WithSection(textSection),
+		reify.WithBatchSize(1),
+		reify.WithWorkers(4),
+	)
+	require.Error(t, err)
+}

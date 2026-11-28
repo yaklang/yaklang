@@ -547,33 +547,14 @@ func applyFunctionDefineOn(functions []*ssa.Function) {
 }
 
 func inferTypesOn(functions []*ssa.Function, sharedReturnsPtr func(string) bool) {
-	localPtrs := make(map[string]bool, len(functions))
-	for round := 0; round < 12; round++ {
-		roundChanged := false
-		for _, function := range functions {
-			if function == nil || function.IsExtern() {
-				continue
-			}
-			name := function.GetName()
-			isPtr := localPtrs[name] || (sharedReturnsPtr != nil && sharedReturnsPtr(name))
-			if !isPtr && functionReturnsPointer(function) {
-				localPtrs[name] = true
-				isPtr = true
-				roundChanged = true
-			}
-			if isPtr && markReturnNulls(function) {
-				roundChanged = true
-			}
-			eachFunctionValue(function, func(value ssa.Value) {
-				if inferValueWith(value, localPtrs, sharedReturnsPtr) {
-					roundChanged = true
-				}
-			})
-		}
-		if !roundChanged {
-			break
+	funcs := make([]inferFuncCache, 0, len(functions))
+	for _, function := range functions {
+		if function != nil && !function.IsExtern() {
+			funcs = append(funcs, collectInferFunc(function))
 		}
 	}
+	localPtrs := make(map[string]bool, len(funcs))
+	runInferRounds(funcs, localPtrs, sharedReturnsPtr)
 }
 
 func simplifyPartialWritesOn(functions []*ssa.Function) {

@@ -140,38 +140,40 @@ func ConvertInto(ctx context.Context, program *ssa.Program, ir *core.LowIR, opti
 
 func convertInto(ctx context.Context, program *ssa.Program, ir *core.LowIR, settings Options) ([]*ssa.Function, []core.Diagnostic, error) {
 	converter := &converter{
-		ctx:           ctx,
-		program:       program,
-		facts:         ir.Facts(),
-		pointerAt:     settings.PointerAt,
-		types:         make(map[core.ValueType]ssa.Type, 16),
-		signedTypes:   make(map[uint16]ssa.Type, 8),
-		blocks:        make(map[core.BlockID]*ssa.BasicBlock),
-		values:        make(map[core.ValueID]ssa.Value),
-		defs:          make(map[core.ValueID]core.Instruction),
-		variables:     make(map[string]*ssa.Variable),
-		memory:        make(map[string]*ssa.Variable),
-		memoryNames:   make(map[string]string),
-		functions:     make(map[string]*ssa.Function),
-		flags:         make(map[core.ValueID]flagInfo),
-		arguments:     make(map[string]bool),
-		loopHeaders:   make(map[core.BlockID]bool),
-		loopPhis:      make(map[core.BlockID]map[string]*ssa.Phi),
-		loopPhiOrder:  make(map[core.BlockID][]loopPhiRef),
-		loopPhiDone:   make(map[int64]bool),
-		headerStore:   make(map[core.BlockID]map[string]bool),
-		loopCarried:   make(map[core.BlockID][]string),
-		mergePhis:     make(map[core.BlockID]map[string]*ssa.Phi),
-		mergePhiOrder: make(map[core.BlockID][]string),
-		blockOut:      make(map[core.BlockID]map[string]ssa.Value),
-		lowirBySSA:    make(map[int64]core.BlockID),
-		undefined:     make(map[string]ssa.Value),
-		memoryValid:   make(map[string]bool),
-		memoryKind:    make(map[string]memorySlotKind),
-		frameValues:   make(map[ssa.Value]bool),
-		spDerived:     make(map[ssa.Value]bool),
-		frameDerived:  make(map[ssa.Value]bool),
-		diagnostics:   make([]core.Diagnostic, 0),
+		ctx:             ctx,
+		program:         program,
+		facts:           ir.Facts(),
+		pointerAt:       settings.PointerAt,
+		types:           make(map[core.ValueType]ssa.Type, 16),
+		signedTypes:     make(map[uint16]ssa.Type, 8),
+		blocks:          make(map[core.BlockID]*ssa.BasicBlock),
+		values:          make(map[core.ValueID]ssa.Value),
+		defs:            make(map[core.ValueID]core.Instruction),
+		variables:       make(map[string]*ssa.Variable),
+		memory:          make(map[string]*ssa.Variable),
+		memoryNames:     make(map[string]string),
+		functions:       make(map[string]*ssa.Function),
+		flags:           make(map[core.ValueID]flagInfo),
+		arguments:       make(map[string]bool),
+		loopHeaders:     make(map[core.BlockID]bool),
+		loopPhis:        make(map[core.BlockID]map[string]*ssa.Phi),
+		loopPhiOrder:    make(map[core.BlockID][]loopPhiRef),
+		loopPhiDone:     make(map[int64]bool),
+		headerStore:     make(map[core.BlockID]map[string]bool),
+		loopCarried:     make(map[core.BlockID][]string),
+		mergePhis:       make(map[core.BlockID]map[string]*ssa.Phi),
+		mergePhiOrder:   make(map[core.BlockID][]string),
+		blockOut:        make(map[core.BlockID]map[string]ssa.Value),
+		lowirBySSA:      make(map[int64]core.BlockID),
+		convertedBlocks: make(map[core.BlockID]bool),
+		domOutCache:     make(map[domRegKey]ssa.Value),
+		undefined:       make(map[string]ssa.Value),
+		memoryValid:     make(map[string]bool),
+		memoryKind:      make(map[string]memorySlotKind),
+		frameValues:     make(map[ssa.Value]bool),
+		spDerived:       make(map[ssa.Value]bool),
+		frameDerived:    make(map[ssa.Value]bool),
+		diagnostics:     make([]core.Diagnostic, 0),
 	}
 	names := settings.LowIRPasses
 	if len(names) == 0 {
@@ -270,17 +272,19 @@ type converter struct {
 	// mergePhis holds the join phis of a block keyed by the register key, and
 	// blockOut holds the value a block leaves in each register. mergePhiOrder
 	// keeps the creation order of those phis.
-	mergePhis     map[core.BlockID]map[string]*ssa.Phi
-	mergePhiOrder map[core.BlockID][]string
-	blockOut      map[core.BlockID]map[string]ssa.Value
-	lowirBySSA    map[int64]core.BlockID
-	idom          map[core.BlockID]core.BlockID
-	predsOf       map[core.BlockID][]core.BlockID
-	current       core.BlockID
-	types         map[core.ValueType]ssa.Type
-	signedTypes   map[uint16]ssa.Type
-	undefined     map[string]ssa.Value
-	facts         core.ArchFacts
+	mergePhis       map[core.BlockID]map[string]*ssa.Phi
+	mergePhiOrder   map[core.BlockID][]string
+	blockOut        map[core.BlockID]map[string]ssa.Value
+	lowirBySSA      map[int64]core.BlockID
+	convertedBlocks map[core.BlockID]bool
+	domOutCache     map[domRegKey]ssa.Value
+	idom            map[core.BlockID]core.BlockID
+	predsOf         map[core.BlockID][]core.BlockID
+	current         core.BlockID
+	types           map[core.ValueType]ssa.Type
+	signedTypes     map[uint16]ssa.Type
+	undefined       map[string]ssa.Value
+	facts           core.ArchFacts
 	// memoryValid records whether a memory variable still holds the value its
 	// last store wrote. A store through a different address expression that may
 	// alias it clears the flag, so a later load keeps the reload.
@@ -376,10 +380,16 @@ func (c *converter) convertFunction(function core.Function) error {
 		if err := c.convertBlock(block); err != nil {
 			return err
 		}
+		c.convertedBlocks[block.ID] = true
 	}
 	c.fillMergePhis()
 	ssaFunction.Finish()
 	return nil
+}
+
+type domRegKey struct {
+	block core.BlockID
+	key   string
 }
 
 const maxRetainedConverterMap = 4096
@@ -414,6 +424,8 @@ func (c *converter) resetFunctionState() {
 	c.mergePhiOrder = resetMap(c.mergePhiOrder)
 	c.blockOut = resetMap(c.blockOut)
 	c.lowirBySSA = resetMap(c.lowirBySSA)
+	c.convertedBlocks = resetMap(c.convertedBlocks)
+	c.domOutCache = resetMap(c.domOutCache)
 	c.undefined = resetMap(c.undefined)
 	c.memoryValid = resetMap(c.memoryValid)
 	c.memoryKind = resetMap(c.memoryKind)
@@ -443,29 +455,30 @@ func (c *converter) markLoopHeaders(function core.Function) {
 }
 
 func (c *converter) collectLoopCarried(function core.Function) {
+	if len(c.loopHeaders) == 0 {
+		return
+	}
+	headerPos := make(map[core.BlockID]int, len(c.loopHeaders))
+	maxBackEdge := make(map[core.BlockID]int, len(c.loopHeaders))
 	for position, block := range function.Blocks {
-		header := block.ID
-		if !c.loopHeaders[header] {
-			continue
+		if c.loopHeaders[block.ID] {
+			headerPos[block.ID] = position
+			maxBackEdge[block.ID] = -1
 		}
-		last := position
-		hasBackEdge := false
-		for index, block := range function.Blocks {
-			if index < position {
-				continue
-			}
-			for _, instruction := range block.Instructions {
-				for _, target := range instruction.Targets {
-					if target == header {
-						hasBackEdge = true
-						if index > last {
-							last = index
-						}
-					}
+	}
+	for index, block := range function.Blocks {
+		for _, instruction := range block.Instructions {
+			for _, target := range instruction.Targets {
+				if hp, isHeader := headerPos[target]; isHeader && index >= hp && index > maxBackEdge[target] {
+					maxBackEdge[target] = index
 				}
 			}
 		}
-		if !hasBackEdge {
+	}
+	for position, block := range function.Blocks {
+		header := block.ID
+		last, ok := maxBackEdge[header]
+		if !ok || last < 0 {
 			continue
 		}
 		// The keys keep the order the body first touches the memory, so the phis of
